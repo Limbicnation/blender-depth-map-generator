@@ -205,7 +205,7 @@ class DEPTHMAP_OT_setup(Operator):
         if not ramp_node:
             # If somehow the color ramp is missing, rebuild the node setup
             self.report({'WARNING'}, "Node setup incomplete - rebuilding")
-            scene.depth_map_setup_complete = False
+            context.scene.depth_map_setup_complete = False
             return
         
         # Update file output path if needed
