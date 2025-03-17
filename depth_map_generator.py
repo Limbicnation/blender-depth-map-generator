@@ -11,7 +11,7 @@ bl_info = {
 import bpy
 import os
 from bpy.types import Panel, Operator, PropertyGroup
-from bpy.props import FloatProperty, BoolProperty, EnumProperty, PointerProperty, BoolProperty
+from bpy.props import FloatProperty, BoolProperty, EnumProperty, PointerProperty
 
 
 class DEPTHMAP_PT_main_panel(Panel):
@@ -89,52 +89,68 @@ class DEPTHMAP_OT_setup(Operator):
                 render_layers.label = "Depth Map Input"
                 render_layers.location = (0, 0)
                 
-                # Normalize node
-                normalize = tree.nodes.new(type='CompositorNodeNormalize')
-                normalize.name = "DM_Normalize"
-                normalize.label = "Normalize Depth"
-                normalize.location = (300, 0)
+                # IMPROVED DEPTH MAP PIPELINE:
                 
-                # Conditionally add map range node
+                # 1. Map Range node - always use this for better control
+                map_range = tree.nodes.new(type='CompositorNodeMapRange')
+                map_range.name = "DM_RangeMapper"
+                map_range.label = "Depth Range Adjuster"
+                map_range.location = (200, 0)
+                
+                # Default values ensure full range
                 if depth_settings.use_custom_range:
-                    map_range = tree.nodes.new(type='CompositorNodeMapRange')
-                    map_range.name = "DM_RangeMapper"
-                    map_range.label = "Depth Range Adjuster"
-                    map_range.location = (200, 0)
-                    map_range.inputs['From Min'].default_value = 0
-                    map_range.inputs['From Max'].default_value = 100
-                    # Invert the output range - this is the key fix for black depth maps
-                    map_range.inputs['To Min'].default_value = 1.0  # Was 0.0
-                    map_range.inputs['To Max'].default_value = 0.0  # Was 1.0
-                    
-                    # Update values based on settings
                     map_range.inputs['From Min'].default_value = depth_settings.near_distance
                     map_range.inputs['From Max'].default_value = depth_settings.far_distance
-                    
-                    # Link render layers Z to map range
-                    tree.links.new(render_layers.outputs['Depth'], map_range.inputs['Value'])
-                    # Link map range to normalize
-                    tree.links.new(map_range.outputs['Value'], normalize.inputs[0])
                 else:
-                    # Link directly to normalize if not using custom range
-                    tree.links.new(render_layers.outputs['Depth'], normalize.inputs[0])
-                    
-                    # Add an invert node for better depth visualization
-                    invert = tree.nodes.new(type='CompositorNodeMath')
-                    invert.name = "DM_Inverter"
-                    invert.label = "Invert Depth"
-                    invert.operation = 'SUBTRACT'
-                    invert.inputs[0].default_value = 1.0
-                    invert.location = (400, 0)
-                    tree.links.new(normalize.outputs[0], invert.inputs[1])
-                    normalize = invert  # Redirect the following connections to use the invert node
+                    # Auto-range: use very small near and large far
+                    map_range.inputs['From Min'].default_value = 0.1
+                    map_range.inputs['From Max'].default_value = 1000.0
+                
+                # CRITICAL FIX: Always invert the output range for proper depth visualization
+                map_range.inputs['To Min'].default_value = 1.0
+                map_range.inputs['To Max'].default_value = 0.0
+                
+                # Link render layers Z to map range
+                tree.links.new(render_layers.outputs['Depth'], map_range.inputs['Value'])
+                
+                # 2. Add contrast node to enhance depth differences
+                contrast = tree.nodes.new(type='CompositorNodeBrightContrast')
+                contrast.name = "DM_Contrast"
+                contrast.label = "Enhance Depth Contrast"
+                contrast.location = (400, 0)
+                # Boost contrast to make depth differences more visible
+                contrast.inputs['Contrast'].default_value = 0.2
+                # Link map range to contrast
+                tree.links.new(map_range.outputs['Value'], contrast.inputs['Image'])
+                
+                # 3. Color ramp for better visualization (optional but helpful)
+                colorramp = tree.nodes.new(type='CompositorNodeValToRGB')
+                colorramp.name = "DM_ColorRamp"
+                colorramp.label = "Depth Visualization"
+                colorramp.location = (600, 0)
+                
+                # Configure color ramp for good depth visualization
+                # Clear existing stops
+                if len(colorramp.color_ramp.elements) > 1:
+                    colorramp.color_ramp.elements.remove(colorramp.color_ramp.elements[0])
+                
+                # Add stops for a good grayscale gradient
+                colorramp.color_ramp.elements[0].position = 0.0
+                colorramp.color_ramp.elements[0].color = (0.0, 0.0, 0.0, 1.0)  # Black for far
+                
+                # Add white stop for near objects
+                newstop = colorramp.color_ramp.elements.new(1.0)
+                newstop.color = (1.0, 1.0, 1.0, 1.0)  # White for near
+                
+                # Link contrast to color ramp
+                tree.links.new(contrast.outputs['Image'], colorramp.inputs['Fac'])
                 
                 # ALWAYS create a Composite node - this fixes the Viewer node error
                 composite = tree.nodes.new(type='CompositorNodeComposite')
                 composite.name = "DM_Composite"
                 composite.label = "Depth Map Output"
                 composite.location = (800, -100)  # Position below other output nodes
-                tree.links.new(output_source.outputs[0], composite.inputs['Image'])
+                tree.links.new(colorramp.outputs[0], composite.inputs['Image'])
                 
                 # Set up output based on selected method
                 if depth_settings.depth_output_method == 'COMPOSITE':
@@ -147,7 +163,7 @@ class DEPTHMAP_OT_setup(Operator):
                     viewer.name = "DM_Viewer"
                     viewer.label = "Depth Preview"
                     viewer.location = (800, 50)
-                    tree.links.new(output_source.outputs[0], viewer.inputs['Image'])
+                    tree.links.new(colorramp.outputs[0], viewer.inputs['Image'])
                     
                 elif depth_settings.depth_output_method == 'FILE_OUTPUT':
                     # Check and create output directory
@@ -162,7 +178,7 @@ class DEPTHMAP_OT_setup(Operator):
                     file_output.base_path = depth_settings.output_path
                     # Set filename to include "depth"
                     file_output.file_slots[0].path = "depth_"
-                    tree.links.new(output_source.outputs[0], file_output.inputs['Image'])
+                    tree.links.new(colorramp.outputs[0], file_output.inputs['Image'])
             else:
                 # Just update existing nodes
                 self._update_node_settings(context, tree, depth_settings)
@@ -205,7 +221,7 @@ class DEPTHMAP_OT_setup(Operator):
         if not ramp_node:
             # If somehow the color ramp is missing, rebuild the node setup
             self.report({'WARNING'}, "Node setup incomplete - rebuilding")
-            scene.depth_map_setup_complete = False
+            context.scene.depth_map_setup_complete = False
             return
         
         # Update file output path if needed
