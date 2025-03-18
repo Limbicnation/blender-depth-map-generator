@@ -1,8 +1,17 @@
 # Blender Depth Map Generator
 
-<p align="center">
-  <img src="images/depth-map-icon.svg" alt="Depth Map Generator Icon" width="250"/>
-</p>
+<div align="center">
+  <table>
+    <tr>
+      <td align="center" width="50%">
+        <img src="images/depth-map-icon.svg" alt="Depth Map Generator Icon" width="300"/>
+      </td>
+      <td align="center" width="50%">
+        <img src="images/depth-ui-round-corners.png" alt="Depth Map UI" width="300"/>
+      </td>
+    </tr>
+  </table>
+</div>
 
 A simple Blender addon that automates depth map (Z-depth) creation and rendering with a clean UI.
 
