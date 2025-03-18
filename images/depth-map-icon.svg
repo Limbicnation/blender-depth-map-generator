@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- Background -->
+  <rect width="128" height="128" rx="16" fill="#2D2D2D"/>
+  
+  <!-- Depth gradient background -->
+  <defs>
+    <linearGradient id="depthGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#000000"/>
+      <stop offset="100%" style="stop-color:#FFFFFF"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Main rounded depth map visualization -->
+  <rect x="20" y="26" width="88" height="60" rx="6" fill="url(#depthGradient)"/>
+  
+  <!-- Camera icon -->
+  <circle cx="64" cy="16" r="8" fill="#FF5F00"/>
+  <path d="M64 24 L64 26" stroke="#FF5F00" stroke-width="2" stroke-linecap="round"/>
+  
+  <!-- Depth measuring lines -->
+  <line x1="30" y1="96" x2="30" y2="106" stroke="#41B4E8" stroke-width="2"/>
+  <line x1="64" y1="96" x2="64" y2="106" stroke="#41B4E8" stroke-width="2"/>
+  <line x1="98" y1="96" x2="98" y2="106" stroke="#41B4E8" stroke-width="2"/>
+  
+  <line x1="30" y1="101" x2="98" y2="101" stroke="#41B4E8" stroke-width="2"/>
+  
+  <!-- Z Axis label -->
+  <text x="112" y="102" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#41B4E8">Z</text>
+  
+  <!-- Measurement values -->
+  <text x="28" y="118" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#FFFFFF">0</text>
+  <text x="98" y="118" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#FFFFFF">100</text>
+  
+  <!-- Small grid overlay to indicate 3D space -->
+  <path d="M30 40 L98 40 M30 56 L98 56 M30 72 L98 72 
+           M42 26 L42 86 M64 26 L64 86 M86 26 L86 86" 
+        stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+</svg>
