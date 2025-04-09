@@ -1,10 +1,10 @@
 bl_info = {
     "name": "Depth Map Generator",
     "author": "Your Name",
-    "version": (1, 1),
+    "version": (1, 2),
     "blender": (3, 0, 0),
     "location": "View3D > Sidebar > Depth Map",
-    "description": "Automates depth map setup and rendering",
+    "description": "Automates depth map setup and rendering for stills and animations",
     "category": "Render",
 }
 
@@ -48,9 +48,28 @@ class DEPTHMAP_PT_main_panel(Panel):
         
         if depth_settings.depth_output_method == 'FILE_OUTPUT':
             box.prop(depth_settings, "output_path", text="")
+            
+            # Animation options (only available with file output)
+            box.prop(depth_settings, "render_animation")
+            
+            if depth_settings.render_animation:
+                sub_box = box.box()
+                sub_box.prop(depth_settings, "use_scene_frame_range")
+                
+                if not depth_settings.use_scene_frame_range:
+                    row = sub_box.row(align=True)
+                    row.prop(depth_settings, "frame_start")
+                    row.prop(depth_settings, "frame_end")
+                else:
+                    # Display scene frame range as info
+                    row = sub_box.row()
+                    row.label(text=f"Scene Range: {context.scene.frame_start} - {context.scene.frame_end}")
         
         # Render buttons
-        layout.operator("depthmap.render", text="Render Depth Map", icon='RENDER_STILL')
+        if depth_settings.depth_output_method == 'FILE_OUTPUT' and depth_settings.render_animation:
+            layout.operator("depthmap.render", text="Render Depth Animation", icon='RENDER_ANIMATION')
+        else:
+            layout.operator("depthmap.render", text="Render Depth Map", icon='RENDER_STILL')
         layout.operator("depthmap.reset", text="Reset Compositing", icon='X')
 
         # Setup status indicator
@@ -176,8 +195,20 @@ class DEPTHMAP_OT_setup(Operator):
                     file_output.label = "Depth Map Files"
                     file_output.location = (800, 100)
                     file_output.base_path = depth_settings.output_path
-                    # Set filename to include "depth"
-                    file_output.file_slots[0].path = "depth_"
+                    
+                    # Configure for animation-friendly output with frame placeholders
+                    # When rendering animation, we need the frame number placeholder
+                    if depth_settings.render_animation:
+                        # Use format that includes frame numbers: depth_####.png
+                        file_output.file_slots[0].path = "depth_"
+                        # Enable file format settings for proper animation sequence
+                        file_output.format.file_format = 'PNG'  # Using PNG for lossless depth maps
+                        # Frame padding for numbering (e.g., ####)
+                        # This is handled automatically by Blender's file output node
+                    else:
+                        # Single frame output doesn't need padding
+                        file_output.file_slots[0].path = "depth_"
+                        
                     tree.links.new(colorramp.outputs[0], file_output.inputs['Image'])
             else:
                 # Just update existing nodes
@@ -231,22 +262,63 @@ class DEPTHMAP_OT_setup(Operator):
             output_dir = bpy.path.abspath(depth_settings.output_path)
             os.makedirs(output_dir, exist_ok=True)
             file_output.base_path = depth_settings.output_path
+            
+            # Update animation settings if needed
+            if depth_settings.render_animation:
+                # Ensure we have proper animation setup with frame placeholders
+                file_output.format.file_format = 'PNG'  # Using PNG for lossless depth maps
+            else:
+                # Use simple filename for single frame
+                file_output.file_slots[0].path = "depth_"
 
 
 class DEPTHMAP_OT_render(Operator):
-    """Renders the depth map"""
+    """Renders the depth map or animation sequence"""
     bl_idname = "depthmap.render"
     bl_label = "Render Depth Map"
     bl_description = "Render the depth map with current settings"
     
     def execute(self, context):
         try:
+            scene = context.scene
+            depth_settings = scene.depth_map_settings
+            
             # Only run setup if not already set up or if settings have changed
-            if not hasattr(context.scene, "depth_map_setup_complete") or not context.scene.depth_map_setup_complete:
+            if not hasattr(scene, "depth_map_setup_complete") or not scene.depth_map_setup_complete:
                 bpy.ops.depthmap.setup()
             
-            # Then render
-            bpy.ops.render.render('INVOKE_DEFAULT')
+            # Check if animation rendering is enabled
+            if (depth_settings.depth_output_method == 'FILE_OUTPUT' and 
+                depth_settings.render_animation):
+                
+                # Store original frame range to restore later
+                original_start = scene.frame_start
+                original_end = scene.frame_end
+                
+                # Set frame range if using custom range
+                if not depth_settings.use_scene_frame_range:
+                    scene.frame_start = depth_settings.frame_start
+                    scene.frame_end = depth_settings.frame_end
+                
+                # Display animation info message
+                frame_count = scene.frame_end - scene.frame_start + 1
+                output_dir = bpy.path.abspath(depth_settings.output_path)
+                
+                self.report({'INFO'}, 
+                          f"Rendering depth animation: {frame_count} frames to {output_dir}")
+                
+                # Render animation with current settings
+                # Using INVOKE_DEFAULT to show progress to user
+                bpy.ops.render.render('INVOKE_DEFAULT', animation=True)
+                
+                # Note: We don't restore frame range immediately as that would
+                # interfere with rendering. Blender will handle the frame range
+                # internally during rendering.
+                
+            else:
+                # Render single frame
+                self.report({'INFO'}, "Rendering single depth map frame")
+                bpy.ops.render.render('INVOKE_DEFAULT')
             
             return {'FINISHED'}
         except Exception as e:
@@ -333,6 +405,33 @@ class DepthMapSettings(PropertyGroup):
         description="Path to save depth map files",
         default="//depth_maps/",
         subtype='DIR_PATH'
+    )
+    
+    # Animation properties
+    render_animation: BoolProperty(
+        name="Render Animation",
+        description="Render depth maps for the entire animation sequence",
+        default=False
+    )
+    
+    use_scene_frame_range: BoolProperty(
+        name="Use Scene Frame Range",
+        description="Use the scene's start and end frame settings",
+        default=True
+    )
+    
+    frame_start: bpy.props.IntProperty(
+        name="Start Frame",
+        description="First frame to render in the animation sequence",
+        default=1,
+        min=0
+    )
+    
+    frame_end: bpy.props.IntProperty(
+        name="End Frame",
+        description="Last frame to render in the animation sequence",
+        default=250,
+        min=0
     )
 
 

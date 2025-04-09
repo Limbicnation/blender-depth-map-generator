@@ -27,13 +27,18 @@ A simple Blender addon that automates depth map (Z-depth) creation and rendering
 2. Click "Setup Depth Map" to configure Z-pass and compositing
 3. Adjust depth range settings if needed
 4. Choose output method (Composite/Viewer/File)
-5. Click "Render Depth Map"
+5. When using File Output, you can toggle animation mode to render sequences
+6. Click "Render Depth Map" or "Render Depth Animation"
 
 ## Features
 
 - One-click depth map setup
 - Custom near/far distance controls
 - Multiple output options
+- Animation sequence support
+  - Render entire animation as depth maps
+  - Use scene frame range or set custom range
+  - Automatic frame numbering for sequences
 - Simple UI in viewport sidebar
 - Easy reset functionality
 
