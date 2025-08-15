@@ -21,10 +21,22 @@ class DEPTHMAP_PT_main_panel(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = "Depth Map"
+    bl_context = "objectmode"
+
+    @classmethod
+    def poll(cls, context):
+        # Panel should always be visible in 3D View
+        return context.space_data.type == 'VIEW_3D'
 
     def draw(self, context):
         layout = self.layout
         scene = context.scene
+        
+        # Ensure depth_map_settings exists
+        if not hasattr(scene, 'depth_map_settings'):
+            layout.label(text="Error: Addon not properly initialized", icon='ERROR')
+            return
+            
         depth_settings = scene.depth_map_settings
 
         # Main setup button
@@ -188,13 +200,15 @@ class DEPTHMAP_OT_setup(Operator):
                     # Check and create output directory
                     output_dir = bpy.path.abspath(depth_settings.output_path)
                     os.makedirs(output_dir, exist_ok=True)
+                    print(f"DEBUG: Created output directory: {output_dir}")
                     
                     # File output node in addition to the composite node
                     file_output = tree.nodes.new(type='CompositorNodeOutputFile')
                     file_output.name = "DM_FileOutput"
                     file_output.label = "Depth Map Files"
                     file_output.location = (800, 100)
-                    file_output.base_path = depth_settings.output_path
+                    file_output.base_path = output_dir
+                    print(f"DEBUG: Set File Output base_path to: {file_output.base_path}")
                     
                     # Configure file format settings for proper output
                     file_output.format.file_format = 'PNG'
@@ -202,15 +216,25 @@ class DEPTHMAP_OT_setup(Operator):
                     file_output.format.color_depth = '8'
                     file_output.format.compression = 15
                     
-                    # Configure for animation or still frame output
+                    # Link the color ramp output to file output first
+                    tree.links.new(colorramp.outputs[0], file_output.inputs['Image'])
+                    
+                    # Configure file slot for animation or still frame output
                     if depth_settings.render_animation:
-                        # Use format that includes frame numbers: depth_####.png
-                        file_output.file_slots[0].path = "depth_####.png"
+                        # Use format that includes frame numbers (Blender adds .png automatically)
+                        file_output.file_slots[0].path = "depth_"
+                        print(f"DEBUG: Animation mode - file slot path: {file_output.file_slots[0].path}")
                     else:
                         # Single frame output
-                        file_output.file_slots[0].path = "depth_map.png"
-                        
-                    tree.links.new(colorramp.outputs[0], file_output.inputs['Image'])
+                        file_output.file_slots[0].path = "depth_map"
+                        print(f"DEBUG: Single frame mode - file slot path: {file_output.file_slots[0].path}")
+                    
+                    # Ensure the file slot uses the same format settings
+                    file_output.file_slots[0].format.file_format = 'PNG'
+                    file_output.file_slots[0].format.color_mode = 'BW'
+                    file_output.file_slots[0].format.color_depth = '8'
+                    file_output.file_slots[0].format.compression = 15
+                    print(f"DEBUG: File slot format configured - PNG, BW, 8-bit")
             else:
                 # Just update existing nodes
                 self._update_node_settings(context, tree, depth_settings)
@@ -262,7 +286,7 @@ class DEPTHMAP_OT_setup(Operator):
             # Check and create output directory
             output_dir = bpy.path.abspath(depth_settings.output_path)
             os.makedirs(output_dir, exist_ok=True)
-            file_output.base_path = depth_settings.output_path
+            file_output.base_path = output_dir
             
             # Configure file format settings for proper output
             file_output.format.file_format = 'PNG'
@@ -272,11 +296,17 @@ class DEPTHMAP_OT_setup(Operator):
             
             # Update animation settings if needed
             if depth_settings.render_animation:
-                # Use format that includes frame numbers: depth_####.png
-                file_output.file_slots[0].path = "depth_####.png"
+                # Use format that includes frame numbers (Blender adds .png automatically)
+                file_output.file_slots[0].path = "depth_"
             else:
-                # Single frame output with proper extension
-                file_output.file_slots[0].path = "depth_map.png"
+                # Single frame output
+                file_output.file_slots[0].path = "depth_map"
+            
+            # Ensure the file slot uses the same format settings
+            file_output.file_slots[0].format.file_format = 'PNG'
+            file_output.file_slots[0].format.color_mode = 'BW'
+            file_output.file_slots[0].format.color_depth = '8'
+            file_output.file_slots[0].format.compression = 15
 
 
 class DEPTHMAP_OT_render(Operator):
@@ -298,9 +328,7 @@ class DEPTHMAP_OT_render(Operator):
             if (depth_settings.depth_output_method == 'FILE_OUTPUT' and 
                 depth_settings.render_animation):
                 
-                # Store original frame range to restore later
-                original_start = scene.frame_start
-                original_end = scene.frame_end
+                # Note: Blender handles frame range restoration automatically during rendering
                 
                 # Set frame range if using custom range
                 if not depth_settings.use_scene_frame_range:
@@ -311,8 +339,19 @@ class DEPTHMAP_OT_render(Operator):
                 frame_count = scene.frame_end - scene.frame_start + 1
                 output_dir = bpy.path.abspath(depth_settings.output_path)
                 
+                # Debug: Check File Output node exists and is configured
+                tree = scene.node_tree
+                file_output = tree.nodes.get("DM_FileOutput")
+                if file_output:
+                    print(f"DEBUG: File Output node found - base_path: {file_output.base_path}")
+                    print(f"DEBUG: File slot path: {file_output.file_slots[0].path}")
+                    print(f"DEBUG: Full expected output path: {file_output.base_path}/{file_output.file_slots[0].path}")
+                else:
+                    print("DEBUG: WARNING - File Output node not found!")
+                
                 self.report({'INFO'}, 
                           f"Rendering depth animation: {frame_count} frames to {output_dir}")
+                print(f"DEBUG: Starting animation render - frames {scene.frame_start} to {scene.frame_end}")
                 
                 # Render animation with current settings
                 # Using INVOKE_DEFAULT to show progress to user
@@ -452,20 +491,33 @@ classes = (
 )
 
 def register():
-    for cls in classes:
-        bpy.utils.register_class(cls)
-    bpy.types.Scene.depth_map_settings = PointerProperty(type=DepthMapSettings)
-    # Register setup tracking property
-    bpy.types.Scene.depth_map_setup_complete = BoolProperty(default=False)
+    try:
+        for cls in classes:
+            bpy.utils.register_class(cls)
+        bpy.types.Scene.depth_map_settings = PointerProperty(type=DepthMapSettings)
+        # Register setup tracking property
+        bpy.types.Scene.depth_map_setup_complete = BoolProperty(default=False)
+        print("Depth Map Generator addon registered successfully")
+    except Exception as e:
+        print(f"Error registering Depth Map Generator addon: {e}")
+        raise
 
 def unregister():
-    # Clean up tracking property
-    if hasattr(bpy.types.Scene, "depth_map_setup_complete"):
-        del bpy.types.Scene.depth_map_setup_complete
-    
-    for cls in reversed(classes):
-        bpy.utils.unregister_class(cls)
-    del bpy.types.Scene.depth_map_settings
+    try:
+        # Clean up tracking property
+        if hasattr(bpy.types.Scene, "depth_map_setup_complete"):
+            del bpy.types.Scene.depth_map_setup_complete
+        
+        for cls in reversed(classes):
+            bpy.utils.unregister_class(cls)
+        
+        if hasattr(bpy.types.Scene, "depth_map_settings"):
+            del bpy.types.Scene.depth_map_settings
+            
+        print("Depth Map Generator addon unregistered successfully")
+    except Exception as e:
+        print(f"Error unregistering Depth Map Generator addon: {e}")
+        raise
 
 if __name__ == "__main__":
     register()
