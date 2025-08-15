@@ -196,18 +196,19 @@ class DEPTHMAP_OT_setup(Operator):
                     file_output.location = (800, 100)
                     file_output.base_path = depth_settings.output_path
                     
-                    # Configure for animation-friendly output with frame placeholders
-                    # When rendering animation, we need the frame number placeholder
+                    # Configure file format settings for proper output
+                    file_output.format.file_format = 'PNG'
+                    file_output.format.color_mode = 'BW'
+                    file_output.format.color_depth = '8'
+                    file_output.format.compression = 15
+                    
+                    # Configure for animation or still frame output
                     if depth_settings.render_animation:
                         # Use format that includes frame numbers: depth_####.png
-                        file_output.file_slots[0].path = "depth_"
-                        # Enable file format settings for proper animation sequence
-                        file_output.format.file_format = 'PNG'  # Using PNG for lossless depth maps
-                        # Frame padding for numbering (e.g., ####)
-                        # This is handled automatically by Blender's file output node
+                        file_output.file_slots[0].path = "depth_####.png"
                     else:
-                        # Single frame output doesn't need padding
-                        file_output.file_slots[0].path = "depth_"
+                        # Single frame output
+                        file_output.file_slots[0].path = "depth_map.png"
                         
                     tree.links.new(colorramp.outputs[0], file_output.inputs['Image'])
             else:
@@ -263,13 +264,19 @@ class DEPTHMAP_OT_setup(Operator):
             os.makedirs(output_dir, exist_ok=True)
             file_output.base_path = depth_settings.output_path
             
+            # Configure file format settings for proper output
+            file_output.format.file_format = 'PNG'
+            file_output.format.color_mode = 'BW'
+            file_output.format.color_depth = '8'
+            file_output.format.compression = 15
+            
             # Update animation settings if needed
             if depth_settings.render_animation:
-                # Ensure we have proper animation setup with frame placeholders
-                file_output.format.file_format = 'PNG'  # Using PNG for lossless depth maps
+                # Use format that includes frame numbers: depth_####.png
+                file_output.file_slots[0].path = "depth_####.png"
             else:
-                # Use simple filename for single frame
-                file_output.file_slots[0].path = "depth_"
+                # Single frame output with proper extension
+                file_output.file_slots[0].path = "depth_map.png"
 
 
 class DEPTHMAP_OT_render(Operator):
