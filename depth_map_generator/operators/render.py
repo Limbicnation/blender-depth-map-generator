@@ -17,6 +17,8 @@ class DEPTHMAP_OT_render(Operator):
         try:
             scene = context.scene
             settings = scene.depth_map_settings
+            prefs = context.preferences.addons.get("depth_map_generator")
+            prefs = prefs.preferences if prefs else None
 
             # Auto-setup if not already configured
             if not settings.setup_complete:
@@ -30,7 +32,7 @@ class DEPTHMAP_OT_render(Operator):
                     scene.frame_end = settings.frame_end
 
                 frame_count = scene.frame_end - scene.frame_start + 1
-                output_dir = paths.get_depth_output_dir(settings)
+                output_dir = paths.get_depth_output_dir(settings, prefs)
                 self.report(
                     {'INFO'},
                     f"Rendering depth animation: {frame_count} frames to {output_dir}"

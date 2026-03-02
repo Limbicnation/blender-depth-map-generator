@@ -36,9 +36,8 @@ class DEPTHMAP_OT_setup(Operator):
             tree = scene.node_tree
 
             if not settings.setup_complete:
-                # Fresh setup: clear and rebuild
-                for node in tree.nodes:
-                    tree.nodes.remove(node)
+                # Fresh setup: remove only DM_ nodes to preserve user's setup
+                nodes.remove_dm_nodes(tree)
 
                 # Build depth pipeline
                 render_layers, output_socket = nodes.create_depth_pipeline(
@@ -54,7 +53,7 @@ class DEPTHMAP_OT_setup(Operator):
 
             else:
                 # Update existing nodes
-                if not nodes.update_depth_nodes(tree, settings):
+                if not nodes.update_depth_nodes(tree, settings, prefs):
                     self.report({'WARNING'}, "Node setup incomplete - rebuilding")
                     settings.setup_complete = False
                     return self.execute(context)

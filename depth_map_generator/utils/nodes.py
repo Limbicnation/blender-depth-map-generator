@@ -355,7 +355,7 @@ def create_mask_pipeline(tree, render_layers, settings, prefs=None):
     tree.links.new(mask_output_socket, mask_file_output.inputs['Image'])
 
 
-def update_depth_nodes(tree, settings):
+def update_depth_nodes(tree, settings, prefs=None):
     """Update existing depth pipeline nodes without recreating them.
 
     Returns True if update succeeded, False if rebuild is needed.
@@ -388,7 +388,7 @@ def update_depth_nodes(tree, settings):
     from . import paths
     file_output = find_dm_node(tree, "DM_FileOutput")
     if file_output and settings.depth_output_method == 'FILE_OUTPUT':
-        output_dir = paths.get_depth_output_dir(settings)
+        output_dir = paths.get_depth_output_dir(settings, prefs)
         paths.resolve_output_path(output_dir, create=True)
         prefix = "depth_" if settings.render_animation else "depth_map"
         configure_file_output(

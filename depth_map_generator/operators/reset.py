@@ -22,9 +22,9 @@ class DEPTHMAP_OT_reset(Operator):
             context.view_layer.use_pass_z = False
             context.view_layer.use_pass_object_index = False
 
-            # Reset compositor to default
+            # Remove only DM_ nodes to preserve user's existing setup
             if scene.use_nodes:
-                nodes.clear_all_nodes(scene.node_tree)
+                nodes.remove_dm_nodes(scene.node_tree)
 
             # Reset setup flag
             scene.depth_map_settings.setup_complete = False

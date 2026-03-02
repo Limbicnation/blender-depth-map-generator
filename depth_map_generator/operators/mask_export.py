@@ -24,6 +24,8 @@ class DEPTHMAP_OT_export_mask(Operator):
             scene = context.scene
             settings = scene.depth_map_settings
             tree = scene.node_tree
+            prefs = context.preferences.addons.get("depth_map_generator")
+            prefs = prefs.preferences if prefs else None
 
             # Validate Cryptomatte requires Cycles
             if (settings.mask_source == 'CRYPTOMATTE'
@@ -44,19 +46,16 @@ class DEPTHMAP_OT_export_mask(Operator):
                     self.report({'ERROR'}, "Run Setup first")
                     return {'CANCELLED'}
 
-                prefs = context.preferences.addons.get("depth_map_generator")
-                prefs = prefs.preferences if prefs else None
                 nodes.create_mask_pipeline(tree, render_layers, settings, prefs)
 
             # Render
-            if (settings.depth_output_method == 'FILE_OUTPUT'
-                    and settings.render_animation):
+            if settings.render_animation:
                 if not settings.use_scene_frame_range:
                     scene.frame_start = settings.frame_start
                     scene.frame_end = settings.frame_end
 
                 frame_count = scene.frame_end - scene.frame_start + 1
-                output_dir = paths.get_mask_output_dir(settings)
+                output_dir = paths.get_mask_output_dir(settings, prefs)
                 self.report(
                     {'INFO'},
                     f"Exporting mask animation: {frame_count} frames to {output_dir}"

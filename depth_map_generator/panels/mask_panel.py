@@ -47,8 +47,7 @@ class DEPTHMAP_PT_mask(Panel):
         layout.separator()
         row = layout.row()
         row.enabled = settings.mask_enabled
-        if (settings.depth_output_method == 'FILE_OUTPUT'
-                and settings.render_animation):
+        if settings.render_animation:
             row.operator("depthmap.export_mask", text="Export Mask Animation",
                           icon='RENDER_ANIMATION')
         else:
