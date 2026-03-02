@@ -23,13 +23,17 @@ class DEPTHMAP_OT_setup(Operator):
             prefs = context.preferences.addons.get("depth_map_generator")
             prefs = prefs.preferences if prefs else None
 
-            # Enable Z pass
+            # Enable render passes on view layer
             view_layer = context.view_layer
             view_layer.use_pass_z = True
 
-            # Enable Object Index pass if mask is enabled with Object Index source
             if settings.mask_enabled and settings.mask_source == 'OBJECT_INDEX':
                 view_layer.use_pass_object_index = True
+
+            # Force Blender to process pass changes before we create
+            # compositor nodes that depend on those passes (IndexOB, etc.)
+            scene.update_tag()
+            context.evaluated_depsgraph_get().update()
 
             # Set up compositing
             scene.use_nodes = True
@@ -47,11 +51,11 @@ class DEPTHMAP_OT_setup(Operator):
                 # Create output nodes
                 nodes.create_output_nodes(tree, settings, output_socket, prefs)
 
-                # Build mask pipeline if enabled (isolated - must not block depth)
+                # Build mask pipeline if enabled (uses separate RenderLayers)
                 if settings.mask_enabled:
                     try:
                         nodes.create_mask_pipeline(
-                            tree, render_layers, settings, prefs
+                            tree, settings, prefs
                         )
                     except Exception as e:
                         self.report(

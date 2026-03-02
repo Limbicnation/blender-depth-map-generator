@@ -5,18 +5,22 @@ import os
 import bpy
 
 
-def resolve_output_path(path, create=True):
+def resolve_output_path(path, create=True, prefs=None):
     """Resolve a Blender path (possibly relative with //) to absolute and optionally create it.
 
     Args:
         path: Blender-style path string
         create: If True, create the directory if it doesn't exist
+        prefs: AddonPreferences (optional) - respects auto_create_directories
 
     Returns:
         Absolute path string
     """
     abs_path = bpy.path.abspath(path)
-    if create:
+    should_create = create
+    if prefs and hasattr(prefs, 'auto_create_directories'):
+        should_create = create and prefs.auto_create_directories
+    if should_create:
         os.makedirs(abs_path, exist_ok=True)
     return abs_path
 

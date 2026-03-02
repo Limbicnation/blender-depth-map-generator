@@ -22,9 +22,14 @@ class DEPTHMAP_OT_reset(Operator):
             context.view_layer.use_pass_z = False
             context.view_layer.use_pass_object_index = False
 
-            # Remove only DM_ nodes to preserve user's existing setup
             if scene.use_nodes:
-                nodes.remove_dm_nodes(scene.node_tree)
+                tree = scene.node_tree
+                # Remove only DM_ nodes to preserve user's existing setup
+                nodes.remove_dm_nodes(tree)
+
+                # If compositor is now empty, restore default RenderLayers -> Composite
+                if len(tree.nodes) == 0:
+                    nodes.clear_all_nodes(tree)
 
             # Reset setup flag
             scene.depth_map_settings.setup_complete = False

@@ -47,8 +47,7 @@ def configure_file_output(node, base_path, prefix, bit_depth='16',
     node.format.color_depth = bit_depth
     node.format.compression = 15
 
-    slot_path = prefix if is_anim else prefix
-    node.file_slots[0].path = slot_path
+    node.file_slots[0].path = prefix
     node.file_slots[0].format.file_format = 'PNG'
     node.file_slots[0].format.color_mode = color_mode
     node.file_slots[0].format.color_depth = bit_depth
@@ -283,7 +282,7 @@ def create_output_nodes(tree, settings, output_socket, prefs=None):
 
     elif settings.depth_output_method == 'FILE_OUTPUT':
         output_dir = paths.get_depth_output_dir(settings, prefs)
-        paths.resolve_output_path(output_dir, create=True)
+        paths.resolve_output_path(output_dir, create=True, prefs=prefs)
 
         file_output = tree.nodes.new(type='CompositorNodeOutputFile')
         file_output.name = "DM_FileOutput"
@@ -307,26 +306,54 @@ def create_output_nodes(tree, settings, output_socket, prefs=None):
         tree.links.new(output_socket, viewer.inputs['Image'])
 
 
-def create_mask_pipeline(tree, render_layers, settings, prefs=None):
+def create_mask_pipeline(tree, settings, prefs=None):
     """Build the alpha mask compositor pipeline.
+
+    Creates its own DM_MaskRenderLayers node to guarantee that
+    IndexOB / Cryptomatte outputs are available (independent of the
+    depth pipeline's RenderLayers node).
 
     Args:
         tree: The compositor node tree
-        render_layers: Existing DM_RenderLayers node
         settings: DepthMapSettings property group
         prefs: AddonPreferences (optional)
     """
     from . import paths
 
     if settings.mask_source == 'OBJECT_INDEX':
-        # Verify IndexOB output exists on the RenderLayers node
-        if 'IndexOB' not in render_layers.outputs:
+        # Ensure pass is enabled before creating the node
+        view_layer = bpy.context.view_layer
+        view_layer.use_pass_object_index = True
+
+        # Create a dedicated RenderLayers node for the mask pipeline
+        mask_rl = tree.nodes.new(type='CompositorNodeRLayers')
+        mask_rl.name = "DM_MaskRenderLayers"
+        mask_rl.label = "Mask Input"
+        mask_rl.location = (0, -300)
+
+        # Assign view layer and force depsgraph update so the node
+        # rebuilds its sockets with the newly enabled IndexOB pass
+        mask_rl.layer = view_layer.name
+        bpy.context.scene.update_tag()
+        bpy.context.evaluated_depsgraph_get().update()
+
+        # Find IndexOB socket by iteration — the 'in' operator on
+        # bpy_prop_collection can fail for pass sockets even when
+        # the socket exists, because it uses internal key lookup
+        # that may not reflect recently enabled passes.
+        index_ob = next(
+            (s for s in mask_rl.outputs if s.name == 'IndexOB'), None
+        )
+        if index_ob is None:
+            available = [s.name for s in mask_rl.outputs]
             raise RuntimeError(
-                "IndexOB output not found. Click 'Setup Depth Map' again - "
-                "the Object Index pass was just enabled and needs a fresh node."
+                "IndexOB output not found on RenderLayers node. "
+                f"Available outputs: {available}. "
+                "Enable 'Object Index Pass' on the view layer "
+                "(Properties > View Layer > Passes > Data)."
             )
 
-        # Object Index: IndexOB -> Compare(mask_index) -> FileOutput
+        # IndexOB -> Compare(mask_index) -> FileOutput
         compare = tree.nodes.new(type='CompositorNodeMath')
         compare.name = "DM_MaskCompare"
         compare.label = "Mask Index Compare"
@@ -334,10 +361,15 @@ def create_mask_pipeline(tree, render_layers, settings, prefs=None):
         compare.operation = 'COMPARE'
         compare.inputs[1].default_value = float(settings.mask_index)
         compare.inputs[2].default_value = 0.5  # epsilon
-        tree.links.new(render_layers.outputs['IndexOB'], compare.inputs[0])
+        tree.links.new(index_ob, compare.inputs[0])
         mask_output_socket = compare.outputs['Value']
 
     elif settings.mask_source == 'CRYPTOMATTE':
+        if bpy.app.version < (3, 2, 0):
+            raise RuntimeError(
+                "CryptomatteV2 requires Blender 3.2 or newer."
+            )
+
         # Cryptomatte node
         crypto = tree.nodes.new(type='CompositorNodeCryptomatteV2')
         crypto.name = "DM_Cryptomatte"
@@ -350,7 +382,7 @@ def create_mask_pipeline(tree, render_layers, settings, prefs=None):
 
     # Create mask file output
     output_dir = paths.get_mask_output_dir(settings, prefs)
-    paths.resolve_output_path(output_dir, create=True)
+    paths.resolve_output_path(output_dir, create=True, prefs=prefs)
 
     mask_file_output = tree.nodes.new(type='CompositorNodeOutputFile')
     mask_file_output.name = "DM_MaskFileOutput"
@@ -401,7 +433,7 @@ def update_depth_nodes(tree, settings, prefs=None):
     file_output = find_dm_node(tree, "DM_FileOutput")
     if file_output and settings.depth_output_method == 'FILE_OUTPUT':
         output_dir = paths.get_depth_output_dir(settings, prefs)
-        paths.resolve_output_path(output_dir, create=True)
+        paths.resolve_output_path(output_dir, create=True, prefs=prefs)
         prefix = "depth_" if settings.render_animation else "depth_map"
         configure_file_output(
             file_output, output_dir, prefix,

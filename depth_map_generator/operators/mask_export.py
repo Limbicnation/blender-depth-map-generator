@@ -37,16 +37,10 @@ class DEPTHMAP_OT_export_mask(Operator):
                 )
                 return {'CANCELLED'}
 
-            # Ensure mask pipeline exists
+            # Ensure mask pipeline exists, rebuild if missing
             mask_node = nodes.find_dm_node(tree, "DM_MaskFileOutput")
             if not mask_node:
-                # Rebuild mask pipeline
-                render_layers = nodes.find_dm_node(tree, "DM_RenderLayers")
-                if not render_layers:
-                    self.report({'ERROR'}, "Run Setup first")
-                    return {'CANCELLED'}
-
-                nodes.create_mask_pipeline(tree, render_layers, settings, prefs)
+                nodes.create_mask_pipeline(tree, settings, prefs)
 
             # Render
             if settings.render_animation:
