@@ -35,6 +35,11 @@ class DEPTHMAP_OT_setup(Operator):
             scene.use_nodes = True
             tree = scene.node_tree
 
+            # Force depsgraph update so existing RenderLayers nodes
+            # reflect the newly enabled passes (IndexOB, etc.)
+            depsgraph = context.evaluated_depsgraph_get()
+            depsgraph.update()
+
             if not settings.setup_complete:
                 # Fresh setup: remove only DM_ nodes to preserve user's setup
                 nodes.remove_dm_nodes(tree)
