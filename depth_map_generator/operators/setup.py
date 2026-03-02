@@ -35,11 +35,6 @@ class DEPTHMAP_OT_setup(Operator):
             scene.use_nodes = True
             tree = scene.node_tree
 
-            # Force depsgraph update so existing RenderLayers nodes
-            # reflect the newly enabled passes (IndexOB, etc.)
-            depsgraph = context.evaluated_depsgraph_get()
-            depsgraph.update()
-
             if not settings.setup_complete:
                 # Fresh setup: remove only DM_ nodes to preserve user's setup
                 nodes.remove_dm_nodes(tree)
@@ -52,9 +47,17 @@ class DEPTHMAP_OT_setup(Operator):
                 # Create output nodes
                 nodes.create_output_nodes(tree, settings, output_socket, prefs)
 
-                # Build mask pipeline if enabled
+                # Build mask pipeline if enabled (isolated - must not block depth)
                 if settings.mask_enabled:
-                    nodes.create_mask_pipeline(tree, render_layers, settings, prefs)
+                    try:
+                        nodes.create_mask_pipeline(
+                            tree, render_layers, settings, prefs
+                        )
+                    except Exception as e:
+                        self.report(
+                            {'WARNING'},
+                            f"Depth setup OK, but mask failed: {str(e)}"
+                        )
 
             else:
                 # Update existing nodes

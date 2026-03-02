@@ -56,25 +56,12 @@ def configure_file_output(node, base_path, prefix, bit_depth='16',
 
 
 def _create_render_layers(tree):
-    """Get or create the DM_RenderLayers node.
+    """Create a fresh DM_RenderLayers node.
 
-    Reuses an existing RenderLayers node if present, since it already has
-    the correct output sockets for enabled passes. Only creates a new one
-    if none exists in the tree.
+    Always creates a new node so its output sockets reflect the current
+    view layer pass configuration (Depth, IndexOB, etc.). Existing
+    RenderLayers nodes are left untouched to preserve user setups.
     """
-    # First check for our own named node
-    existing = tree.nodes.get("DM_RenderLayers")
-    if existing:
-        return existing
-
-    # Reuse any existing RenderLayers node (Blender default scenes have one)
-    for node in tree.nodes:
-        if node.type == 'R_LAYERS':
-            node.name = "DM_RenderLayers"
-            node.label = "Depth Map Input"
-            return node
-
-    # Only create new if none exists at all
     render_layers = tree.nodes.new(type='CompositorNodeRLayers')
     render_layers.name = "DM_RenderLayers"
     render_layers.label = "Depth Map Input"
@@ -334,18 +321,9 @@ def create_mask_pipeline(tree, render_layers, settings, prefs=None):
     if settings.mask_source == 'OBJECT_INDEX':
         # Verify IndexOB output exists on the RenderLayers node
         if 'IndexOB' not in render_layers.outputs:
-            # Try enabling the pass and getting a fresh depsgraph
-            import bpy
-            bpy.context.view_layer.use_pass_object_index = True
-            depsgraph = bpy.context.evaluated_depsgraph_get()
-            depsgraph.update()
-
-        # Check again after update
-        if 'IndexOB' not in render_layers.outputs:
             raise RuntimeError(
-                "IndexOB pass not available on this RenderLayers node. "
-                "Go to: View Layer Properties > Passes > Data > check 'Object Index', "
-                "then click 'Setup Depth Map' again."
+                "IndexOB output not found. Click 'Setup Depth Map' again - "
+                "the Object Index pass was just enabled and needs a fresh node."
             )
 
         # Object Index: IndexOB -> Compare(mask_index) -> FileOutput
