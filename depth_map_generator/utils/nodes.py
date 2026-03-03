@@ -1,5 +1,7 @@
 """Node creation and management helpers for the depth map compositor pipeline."""
 
+import os
+
 import bpy
 
 
@@ -41,6 +43,10 @@ def configure_file_output(node, base_path, prefix, bit_depth='16',
         color_mode: 'BW' or 'RGBA'
         is_anim: If True, uses prefix for frame numbering; otherwise single file
     """
+    # Ensure base_path ends with a separator so Blender treats it as a
+    # directory, not a filename prefix.
+    if base_path and not base_path.endswith(('/', '\\')):
+        base_path = base_path + os.sep
     node.base_path = base_path
     node.format.file_format = 'PNG'
     node.format.color_mode = color_mode
@@ -386,7 +392,7 @@ def create_mask_pipeline(tree, settings, prefs=None):
 
     # Create mask file output
     output_dir = paths.get_mask_output_dir(settings, prefs)
-    paths.resolve_output_path(output_dir, create=True, prefs=prefs)
+    paths.resolve_output_path(output_dir, create=True, prefs=None)
 
     mask_file_output = tree.nodes.new(type='CompositorNodeOutputFile')
     mask_file_output.name = "DM_MaskFileOutput"
@@ -446,6 +452,19 @@ def update_depth_nodes(tree, settings, prefs=None):
         configure_file_output(
             file_output, output_dir, prefix,
             bit_depth=settings.output_bit_depth, color_mode='BW',
+            is_anim=settings.render_animation
+        )
+
+    # Update mask file output path
+    mask_file_output = find_dm_node(tree, "DM_MaskFileOutput")
+    if mask_file_output and settings.mask_enabled:
+        mask_output_dir = paths.get_mask_output_dir(settings, prefs)
+        paths.resolve_output_path(mask_output_dir, create=True, prefs=None)
+        color_mode = 'RGBA' if settings.mask_output_format == 'RGBA_PNG' else 'BW'
+        prefix = "mask_" if settings.render_animation else "mask_map"
+        configure_file_output(
+            mask_file_output, mask_output_dir, prefix,
+            bit_depth=settings.output_bit_depth, color_mode=color_mode,
             is_anim=settings.render_animation
         )
 
