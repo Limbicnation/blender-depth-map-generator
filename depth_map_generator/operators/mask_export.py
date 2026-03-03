@@ -42,7 +42,7 @@ class DEPTHMAP_OT_export_mask(Operator):
             if not mask_node:
                 nodes.create_mask_pipeline(tree, settings, prefs)
 
-            # Render
+            # Render — mask animation is independent of depth output method
             if settings.render_animation:
                 if not settings.use_scene_frame_range:
                     scene.frame_start = settings.frame_start
