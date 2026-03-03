@@ -17,9 +17,12 @@ A simple Blender addon that automates depth map (Z-depth) creation and rendering
 
 ## Installation
 
-1. Download `depth_map_generator.py`
+1. Download `depth_map_generator.zip` from the [Releases](https://github.com/Limbicnation/blender-depth-map-generator/releases) page
 2. Open Blender → Edit → Preferences → Add-ons → Install
-3. Select the downloaded file and enable the addon
+3. Click **"Install Add-on from File..."**, select `depth_map_generator.zip`
+4. Enable the **"Depth Map Generator"** addon
+
+> **Note:** Do not extract the zip file. Blender installs directly from the zip.
 
 ## Usage
 
@@ -34,11 +37,16 @@ A simple Blender addon that automates depth map (Z-depth) creation and rendering
 
 - One-click depth map setup
 - Custom near/far distance controls
-- Multiple output options
+- Depth normalization modes: LINEAR (default), LOGARITHMIC, RAW
+- Alpha mask export via Object Index or Cryptomatte (Cycles only)
+- 16-bit PNG output for maximum depth precision
+- Contrast/brightness sliders and depth scale factor
+- Multiple output options (Composite/Viewer/File)
 - Animation sequence support
   - Render entire animation as depth maps
   - Use scene frame range or set custom range
   - Automatic frame numbering for sequences
+- ComfyUI integration — specify input directory directly
 - Simple UI in viewport sidebar
 - Easy reset functionality
 
