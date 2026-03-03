@@ -41,6 +41,16 @@ class DEPTHMAP_OT_export_mask(Operator):
             mask_node = nodes.find_dm_node(tree, "DM_MaskFileOutput")
             if not mask_node:
                 nodes.create_mask_pipeline(tree, settings, prefs)
+                mask_node = nodes.find_dm_node(tree, "DM_MaskFileOutput")
+
+            # Validate the mask FileOutput is actually connected
+            if not mask_node or not mask_node.inputs[0].links:
+                self.report(
+                    {'ERROR'},
+                    "Mask pipeline is not connected. "
+                    "Try 'Reset Compositing' then 'Setup Depth Map' with mask enabled."
+                )
+                return {'CANCELLED'}
 
             # Render — mask animation is independent of depth output method
             if settings.render_animation:

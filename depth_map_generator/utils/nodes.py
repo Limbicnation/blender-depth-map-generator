@@ -289,13 +289,17 @@ def create_output_nodes(tree, settings, output_socket, prefs=None):
         file_output.label = "Depth Map Files"
         file_output.location = (x_offset, 100)
 
+        # Link BEFORE configuring file slots — configure_file_output
+        # renames file_slots[0].path which also renames the input
+        # socket, making inputs['Image'] unreliable afterwards.
+        tree.links.new(output_socket, file_output.inputs[0])
+
         prefix = "depth_" if settings.render_animation else "depth_map"
         configure_file_output(
             file_output, output_dir, prefix,
             bit_depth=bit_depth, color_mode='BW',
             is_anim=settings.render_animation
         )
-        tree.links.new(output_socket, file_output.inputs['Image'])
 
     # Optional preview viewer alongside file output
     if settings.preview_before_export and settings.depth_output_method == 'FILE_OUTPUT':
@@ -389,6 +393,11 @@ def create_mask_pipeline(tree, settings, prefs=None):
     mask_file_output.label = "Mask Map Files"
     mask_file_output.location = (400, -300)
 
+    # Link BEFORE configuring file slots — configure_file_output
+    # renames file_slots[0].path which also renames the input
+    # socket, making inputs['Image'] unreliable afterwards.
+    tree.links.new(mask_output_socket, mask_file_output.inputs[0])
+
     color_mode = 'RGBA' if settings.mask_output_format == 'RGBA_PNG' else 'BW'
     prefix = "mask_" if settings.render_animation else "mask_map"
     configure_file_output(
@@ -396,7 +405,6 @@ def create_mask_pipeline(tree, settings, prefs=None):
         bit_depth=settings.output_bit_depth, color_mode=color_mode,
         is_anim=settings.render_animation
     )
-    tree.links.new(mask_output_socket, mask_file_output.inputs['Image'])
 
 
 def update_depth_nodes(tree, settings, prefs=None):
