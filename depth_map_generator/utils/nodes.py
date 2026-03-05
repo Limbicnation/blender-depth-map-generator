@@ -469,10 +469,21 @@ def update_depth_nodes(tree, settings, prefs=None):
                 bit_depth=settings.output_bit_depth, color_mode=color_mode,
                 is_anim=settings.render_animation
             )
+            # Sync mask index threshold to comparator node
+            compare_node = find_dm_node(tree, "DM_MaskCompare")
+            if compare_node:
+                compare_node.inputs[1].default_value = float(settings.mask_index)
         else:
             # Mask was enabled after initial setup — create the pipeline now.
             # Errors are intentionally not caught here so the caller (setup
             # operator) can report them to the user.
             create_mask_pipeline(tree, settings, prefs)
+    elif mask_file_output:
+        # Mask was disabled after setup — remove stale mask pipeline nodes
+        for name in ("DM_MaskFileOutput", "DM_MaskRenderLayers", "DM_MaskCompare",
+                     "DM_Cryptomatte"):
+            node = find_dm_node(tree, name)
+            if node:
+                tree.nodes.remove(node)
 
     return True
