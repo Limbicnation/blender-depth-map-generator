@@ -64,11 +64,18 @@ class DEPTHMAP_OT_setup(Operator):
                         )
 
             else:
-                # Update existing nodes
-                if not nodes.update_depth_nodes(tree, settings, prefs):
-                    self.report({'WARNING'}, "Node setup incomplete - rebuilding")
-                    settings.setup_complete = False
-                    return self.execute(context)
+                # Update existing nodes (may also create mask pipeline
+                # if mask was enabled after initial setup)
+                try:
+                    if not nodes.update_depth_nodes(tree, settings, prefs):
+                        self.report({'WARNING'}, "Node setup incomplete - rebuilding")
+                        settings.setup_complete = False
+                        return self.execute(context)
+                except RuntimeError as e:
+                    self.report(
+                        {'WARNING'},
+                        f"Depth update OK, but mask failed: {str(e)}"
+                    )
 
             settings.setup_complete = True
             self.report({'INFO'}, "Depth map setup complete")

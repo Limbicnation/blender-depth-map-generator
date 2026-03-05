@@ -392,7 +392,7 @@ def create_mask_pipeline(tree, settings, prefs=None):
 
     # Create mask file output
     output_dir = paths.get_mask_output_dir(settings, prefs)
-    paths.resolve_output_path(output_dir, create=True, prefs=None)
+    paths.resolve_output_path(output_dir, create=True, prefs=prefs)
 
     mask_file_output = tree.nodes.new(type='CompositorNodeOutputFile')
     mask_file_output.name = "DM_MaskFileOutput"
@@ -455,17 +455,35 @@ def update_depth_nodes(tree, settings, prefs=None):
             is_anim=settings.render_animation
         )
 
-    # Update mask file output path
+    # Update or create mask pipeline
     mask_file_output = find_dm_node(tree, "DM_MaskFileOutput")
-    if mask_file_output and settings.mask_enabled:
-        mask_output_dir = paths.get_mask_output_dir(settings, prefs)
-        paths.resolve_output_path(mask_output_dir, create=True, prefs=None)
-        color_mode = 'RGBA' if settings.mask_output_format == 'RGBA_PNG' else 'BW'
-        prefix = "mask_" if settings.render_animation else "mask_map"
-        configure_file_output(
-            mask_file_output, mask_output_dir, prefix,
-            bit_depth=settings.output_bit_depth, color_mode=color_mode,
-            is_anim=settings.render_animation
-        )
+    if settings.mask_enabled:
+        if mask_file_output:
+            # Update existing mask file output path
+            mask_output_dir = paths.get_mask_output_dir(settings, prefs)
+            paths.resolve_output_path(mask_output_dir, create=True, prefs=prefs)
+            color_mode = 'RGBA' if settings.mask_output_format == 'RGBA_PNG' else 'BW'
+            prefix = "mask_" if settings.render_animation else "mask_map"
+            configure_file_output(
+                mask_file_output, mask_output_dir, prefix,
+                bit_depth=settings.output_bit_depth, color_mode=color_mode,
+                is_anim=settings.render_animation
+            )
+            # Sync mask index threshold to comparator node
+            compare_node = find_dm_node(tree, "DM_MaskCompare")
+            if compare_node:
+                compare_node.inputs[1].default_value = float(settings.mask_index)
+        else:
+            # Mask was enabled after initial setup — create the pipeline now.
+            # Errors are intentionally not caught here so the caller (setup
+            # operator) can report them to the user.
+            create_mask_pipeline(tree, settings, prefs)
+    elif mask_file_output:
+        # Mask was disabled after setup — remove stale mask pipeline nodes
+        for name in ("DM_MaskFileOutput", "DM_MaskRenderLayers", "DM_MaskCompare",
+                     "DM_Cryptomatte"):
+            node = find_dm_node(tree, name)
+            if node:
+                tree.nodes.remove(node)
 
     return True
