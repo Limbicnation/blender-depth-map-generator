@@ -24,6 +24,17 @@ class DEPTHMAP_OT_render(Operator):
             if not settings.setup_complete:
                 bpy.ops.depthmap.setup()
 
+            # Validate output path when using file output
+            if settings.depth_output_method == 'FILE_OUTPUT':
+                output_dir = paths.get_depth_output_dir(settings, prefs)
+                is_valid, error_msg = paths.validate_output_path(output_dir)
+                if not is_valid:
+                    self.report(
+                        {'ERROR'},
+                        f"Invalid depth output path: {error_msg}"
+                    )
+                    return {'CANCELLED'}
+
             if (settings.depth_output_method == 'FILE_OUTPUT'
                     and settings.render_animation):
                 # Set custom frame range if not using scene range

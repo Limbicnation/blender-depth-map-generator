@@ -52,6 +52,13 @@ class DEPTHMAP_OT_export_mask(Operator):
                 )
                 return {'CANCELLED'}
 
+            # Validate output path before committing to a render
+            output_dir = paths.get_mask_output_dir(settings, prefs)
+            is_valid, error_msg = paths.validate_output_path(output_dir)
+            if not is_valid:
+                self.report({'ERROR'}, f"Invalid mask output path: {error_msg}")
+                return {'CANCELLED'}
+
             # Render — mask animation is independent of depth output method
             if settings.render_animation:
                 if not settings.use_scene_frame_range:
