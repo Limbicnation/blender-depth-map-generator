@@ -176,3 +176,4 @@ cython_debug/
 # Blender addon build artifacts
 depth_map_generator.zip
 *.zip.tmp
+.claude/
