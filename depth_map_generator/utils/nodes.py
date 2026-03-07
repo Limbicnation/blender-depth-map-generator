@@ -32,7 +32,7 @@ def clear_all_nodes(tree):
 
 
 def configure_file_output(node, base_path, prefix, bit_depth='16',
-                          color_mode='BW', is_anim=False):
+                          color_mode='BW'):
     """Centralized FileOutput node configuration.
 
     Args:
@@ -41,7 +41,6 @@ def configure_file_output(node, base_path, prefix, bit_depth='16',
         prefix: Filename prefix (e.g. "depth_" or "depth_map")
         bit_depth: '8' or '16'
         color_mode: 'BW' or 'RGBA'
-        is_anim: If True, uses prefix for frame numbering; otherwise single file
     """
     # Ensure base_path ends with a separator so Blender treats it as a
     # directory, not a filename prefix.
@@ -303,8 +302,7 @@ def create_output_nodes(tree, settings, output_socket, prefs=None):
         prefix = "depth_" if settings.render_animation else "depth_map"
         configure_file_output(
             file_output, output_dir, prefix,
-            bit_depth=bit_depth, color_mode='BW',
-            is_anim=settings.render_animation
+            bit_depth=bit_depth, color_mode='BW'
         )
 
     # Optional preview viewer alongside file output
@@ -408,8 +406,7 @@ def create_mask_pipeline(tree, settings, prefs=None):
     prefix = "mask_" if settings.render_animation else "mask_map"
     configure_file_output(
         mask_file_output, output_dir, prefix,
-        bit_depth=settings.output_bit_depth, color_mode=color_mode,
-        is_anim=settings.render_animation
+        bit_depth=settings.output_bit_depth, color_mode=color_mode
     )
 
 
@@ -451,8 +448,7 @@ def update_depth_nodes(tree, settings, prefs=None):
         prefix = "depth_" if settings.render_animation else "depth_map"
         configure_file_output(
             file_output, output_dir, prefix,
-            bit_depth=settings.output_bit_depth, color_mode='BW',
-            is_anim=settings.render_animation
+            bit_depth=settings.output_bit_depth, color_mode='BW'
         )
 
     # Update or create mask pipeline
@@ -466,8 +462,7 @@ def update_depth_nodes(tree, settings, prefs=None):
             prefix = "mask_" if settings.render_animation else "mask_map"
             configure_file_output(
                 mask_file_output, mask_output_dir, prefix,
-                bit_depth=settings.output_bit_depth, color_mode=color_mode,
-                is_anim=settings.render_animation
+                bit_depth=settings.output_bit_depth, color_mode=color_mode
             )
             # Sync mask index threshold to comparator node
             compare_node = find_dm_node(tree, "DM_MaskCompare")
