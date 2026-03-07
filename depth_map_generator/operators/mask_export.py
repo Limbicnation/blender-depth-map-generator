@@ -66,7 +66,6 @@ class DEPTHMAP_OT_export_mask(Operator):
                     scene.frame_end = settings.frame_end
 
                 frame_count = scene.frame_end - scene.frame_start + 1
-                output_dir = paths.get_mask_output_dir(settings, prefs)
                 self.report(
                     {'INFO'},
                     f"Exporting mask animation: {frame_count} frames to {output_dir}"
