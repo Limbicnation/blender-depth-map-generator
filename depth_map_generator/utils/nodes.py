@@ -73,16 +73,17 @@ def _create_render_layers(tree):
     return render_layers
 
 
-def _create_linear_pipeline(tree, render_layers, settings):
-    """LINEAR normalization: Depth -> MapRange(inverted) -> Contrast -> ColorRamp.
+def _append_range_contrast_ramp(tree, input_socket, settings, x_offset):
+    """Append MapRange, Contrast, and ColorRamp nodes to the pipeline.
 
-    Returns the final output socket to connect to output nodes.
+    Returns:
+        NodeSocket: The final output socket from the ColorRamp node.
     """
     # MapRange node
     map_range = tree.nodes.new(type='CompositorNodeMapRange')
     map_range.name = "DM_RangeMapper"
     map_range.label = "Depth Range Adjuster"
-    map_range.location = (200, 0)
+    map_range.location = (x_offset, 0)
 
     if settings.use_custom_range:
         map_range.inputs['From Min'].default_value = settings.near_distance
@@ -95,13 +96,13 @@ def _create_linear_pipeline(tree, render_layers, settings):
     map_range.inputs['To Min'].default_value = 1.0
     map_range.inputs['To Max'].default_value = 0.0
 
-    tree.links.new(render_layers.outputs['Depth'], map_range.inputs['Value'])
+    tree.links.new(input_socket, map_range.inputs['Value'])
 
     # Contrast node
     contrast = tree.nodes.new(type='CompositorNodeBrightContrast')
     contrast.name = "DM_Contrast"
     contrast.label = "Enhance Depth Contrast"
-    contrast.location = (400, 0)
+    contrast.location = (x_offset + 200, 0)
     contrast.inputs['Contrast'].default_value = settings.contrast_value
     contrast.inputs['Bright'].default_value = settings.brightness_value
     tree.links.new(map_range.outputs['Value'], contrast.inputs['Image'])
@@ -110,7 +111,7 @@ def _create_linear_pipeline(tree, render_layers, settings):
     colorramp = tree.nodes.new(type='CompositorNodeValToRGB')
     colorramp.name = "DM_ColorRamp"
     colorramp.label = "Depth Visualization"
-    colorramp.location = (600, 0)
+    colorramp.location = (x_offset + 400, 0)
 
     if len(colorramp.color_ramp.elements) > 1:
         colorramp.color_ramp.elements.remove(colorramp.color_ramp.elements[0])
@@ -123,6 +124,16 @@ def _create_linear_pipeline(tree, render_layers, settings):
     tree.links.new(contrast.outputs['Image'], colorramp.inputs['Fac'])
 
     return colorramp.outputs[0]
+
+
+def _create_linear_pipeline(tree, render_layers, settings):
+    """LINEAR normalization: Depth -> MapRange(inverted) -> Contrast -> ColorRamp.
+
+    Returns the final output socket to connect to output nodes.
+    """
+    return _append_range_contrast_ramp(
+        tree, render_layers.outputs['Depth'], settings, 200
+    )
 
 
 def _create_logarithmic_pipeline(tree, render_layers, settings):
@@ -148,49 +159,9 @@ def _create_logarithmic_pipeline(tree, render_layers, settings):
     log_node.inputs[1].default_value = 10.0
     tree.links.new(multiply.outputs['Value'], log_node.inputs[0])
 
-    # MapRange node
-    map_range = tree.nodes.new(type='CompositorNodeMapRange')
-    map_range.name = "DM_RangeMapper"
-    map_range.label = "Depth Range Adjuster"
-    map_range.location = (600, 0)
-
-    if settings.use_custom_range:
-        map_range.inputs['From Min'].default_value = settings.near_distance
-        map_range.inputs['From Max'].default_value = settings.far_distance
-    else:
-        map_range.inputs['From Min'].default_value = 0.1
-        map_range.inputs['From Max'].default_value = 1000.0
-
-    map_range.inputs['To Min'].default_value = 1.0
-    map_range.inputs['To Max'].default_value = 0.0
-    tree.links.new(log_node.outputs['Value'], map_range.inputs['Value'])
-
-    # Contrast node
-    contrast = tree.nodes.new(type='CompositorNodeBrightContrast')
-    contrast.name = "DM_Contrast"
-    contrast.label = "Enhance Depth Contrast"
-    contrast.location = (800, 0)
-    contrast.inputs['Contrast'].default_value = settings.contrast_value
-    contrast.inputs['Bright'].default_value = settings.brightness_value
-    tree.links.new(map_range.outputs['Value'], contrast.inputs['Image'])
-
-    # ColorRamp node
-    colorramp = tree.nodes.new(type='CompositorNodeValToRGB')
-    colorramp.name = "DM_ColorRamp"
-    colorramp.label = "Depth Visualization"
-    colorramp.location = (1000, 0)
-
-    if len(colorramp.color_ramp.elements) > 1:
-        colorramp.color_ramp.elements.remove(colorramp.color_ramp.elements[0])
-
-    colorramp.color_ramp.elements[0].position = 0.0
-    colorramp.color_ramp.elements[0].color = (0.0, 0.0, 0.0, 1.0)
-    newstop = colorramp.color_ramp.elements.new(1.0)
-    newstop.color = (1.0, 1.0, 1.0, 1.0)
-
-    tree.links.new(contrast.outputs['Image'], colorramp.inputs['Fac'])
-
-    return colorramp.outputs[0]
+    return _append_range_contrast_ramp(
+        tree, log_node.outputs['Value'], settings, 600
+    )
 
 
 def _create_raw_pipeline(tree, render_layers, settings):
