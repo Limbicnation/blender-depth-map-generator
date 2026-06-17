@@ -24,23 +24,6 @@ class DEPTHMAP_AddonPreferences(AddonPreferences):
         subtype='DIR_PATH',
     )
 
-    default_bit_depth: EnumProperty(
-        name="Default Bit Depth",
-        description="Default bit depth for new scenes",
-        items=[
-            ('8', "8-bit", "Standard 8-bit PNG"),
-            ('16', "16-bit", "High precision 16-bit PNG (recommended)"),
-        ],
-        default='16',
-    )
-
-    comfyui_input_dir: StringProperty(
-        name="ComfyUI Input Directory",
-        description="Optional path to ComfyUI/input/ for direct export",
-        default="",
-        subtype='DIR_PATH',
-    )
-
     auto_create_directories: BoolProperty(
         name="Auto-Create Directories",
         description="Automatically create output directories if they don't exist",
@@ -51,7 +34,4 @@ class DEPTHMAP_AddonPreferences(AddonPreferences):
         layout = self.layout
         layout.prop(self, "default_depth_output_dir")
         layout.prop(self, "default_mask_output_dir")
-        layout.prop(self, "default_bit_depth")
-        layout.separator()
-        layout.prop(self, "comfyui_input_dir")
         layout.prop(self, "auto_create_directories")
