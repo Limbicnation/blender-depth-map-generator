@@ -80,12 +80,26 @@ class DEPTHMAP_OT_export_mask(Operator):
                 )
                 return {"CANCELLED"}
 
-            # Validate output path before committing to a render.
+            # Validate and create output directory before committing to a render.
             output_dir = paths.get_mask_output_dir(settings, prefs)
             is_valid, error_msg = paths.validate_output_path(output_dir)
             if not is_valid:
                 self.report({"ERROR"}, f"Invalid mask output path: {error_msg}")
                 return {"CANCELLED"}
+
+            # Ensure the directory exists. create_mask_pipeline() creates it
+            # during a fresh build, but when the pipeline already exists and
+            # the user changed mask_output_path after setup, the new directory
+            # is never created — and Blender's FileOutput silently fails.
+            paths.resolve_output_path(output_dir, create=True, prefs=prefs)
+
+            # Verify the upstream link (IndexOB -> DM_MaskCompare) is intact.
+            # Blender severs this link when the Object Index pass is toggled
+            # off and on again, because the IndexOB socket is destroyed and
+            # recreated. The existing check at line 75 only validates the
+            # FileOutput connection, not this upstream link.
+            if settings.mask_source == "OBJECT_INDEX":
+                self._ensure_index_ob_link(tree, view_layer, scene, context)
 
             # Re-sync the FileOutput to the current settings. The node keeps the
             # base_path it was given when the pipeline was built, so if an
@@ -138,14 +152,17 @@ class DEPTHMAP_OT_export_mask(Operator):
             return {"CANCELLED"}
 
     def _verify_mask_output(self, output_dir):
-        """Warn (not fail) if no mask PNG was written after a blocking render.
+        """Warn if no mask PNG was written after a blocking render.
 
-        output_dir is already absolute (paths.get_mask_output_dir resolves it),
-        but we re-resolve defensively in case a caller passes a Blender-style
-        relative path.
+        Reports an ERROR (not just WARNING) when the output directory does not
+        exist, since this means the FileOutput node had nowhere to write.
         """
         abs_dir = bpy.path.abspath(output_dir)
         if not os.path.isdir(abs_dir):
+            self.report(
+                {"ERROR"},
+                f"Output directory does not exist: {abs_dir}. Check the mask output path setting.",
+            )
             return
         png_files = [
             f for f in os.listdir(abs_dir) if f.lower().endswith(".png") and "mask" in f.lower()
@@ -154,5 +171,30 @@ class DEPTHMAP_OT_export_mask(Operator):
             self.report(
                 {"WARNING"},
                 f"Render completed but no mask files found in {abs_dir}. "
-                "Check compositor node connections.",
+                "Check compositor node connections and object Pass Index values.",
             )
+
+    @staticmethod
+    def _ensure_index_ob_link(tree, view_layer, scene, context):
+        """Restore the IndexOB -> DM_MaskCompare link if Blender severed it.
+
+        Blender destroys the IndexOB socket (and all links to it) on a
+        CompositorNodeRLayers node when use_pass_object_index is toggled off.
+        Re-enabling the pass recreates the socket but does NOT restore the
+        link. This method detects the gap and reconnects.
+        """
+        mask_rl = nodes.find_dm_node(tree, "DM_MaskRenderLayers")
+        compare = nodes.find_dm_node(tree, "DM_MaskCompare")
+        if not mask_rl or not compare:
+            return
+
+        index_ob = next((s for s in mask_rl.outputs if s.name == "IndexOB"), None)
+        if index_ob is None:
+            # Socket not yet available — force a depsgraph rebuild.
+            mask_rl.layer = view_layer.name
+            scene.update_tag()
+            context.evaluated_depsgraph_get().update()
+            index_ob = next((s for s in mask_rl.outputs if s.name == "IndexOB"), None)
+
+        if index_ob and not index_ob.links:
+            tree.links.new(index_ob, compare.inputs[0])

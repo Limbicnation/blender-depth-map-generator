@@ -338,6 +338,14 @@ def create_mask_pipeline(tree, settings, prefs=None):
         if bpy.app.version < (3, 2, 0):
             raise RuntimeError("CryptomatteV2 requires Blender 3.2 or newer.")
 
+        # Ensure the Cryptomatte render pass is enabled so Cycles outputs the
+        # required AOV data during rendering.
+        view_layer = bpy.context.view_layer
+        if hasattr(view_layer, "use_pass_cryptomatte_object"):
+            view_layer.use_pass_cryptomatte_object = True
+            bpy.context.scene.update_tag()
+            bpy.context.evaluated_depsgraph_get().update()
+
         # Cryptomatte node
         crypto = tree.nodes.new(type="CompositorNodeCryptomatteV2")
         crypto.name = "DM_Cryptomatte"
@@ -422,6 +430,28 @@ def update_depth_nodes(tree, settings, prefs=None):
     # Update or create mask pipeline
     mask_file_output = find_dm_node(tree, "DM_MaskFileOutput")
     if settings.mask_enabled:
+        # Detect mask source mismatch (e.g. user switched from Object Index to
+        # Cryptomatte). The existing pipeline nodes are incompatible, so remove
+        # them and rebuild from scratch.
+        source_mismatch = False
+        if settings.mask_source == "OBJECT_INDEX" and find_dm_node(tree, "DM_Cryptomatte"):
+            source_mismatch = True
+        elif settings.mask_source == "CRYPTOMATTE" and find_dm_node(tree, "DM_MaskCompare"):
+            source_mismatch = True
+
+        if source_mismatch:
+            for name in (
+                "DM_MaskFileOutput",
+                "DM_MaskRenderLayers",
+                "DM_MaskCompare",
+                "DM_Cryptomatte",
+            ):
+                node = find_dm_node(tree, name)
+                if node:
+                    tree.nodes.remove(node)
+            create_mask_pipeline(tree, settings, prefs)
+            return True
+
         if mask_file_output:
             # Update existing mask file output path
             mask_output_dir = paths.get_mask_output_dir(settings, prefs)

@@ -20,6 +20,8 @@ class DEPTHMAP_OT_reset(Operator):
             # Disable render passes
             context.view_layer.use_pass_z = False
             context.view_layer.use_pass_object_index = False
+            if hasattr(context.view_layer, "use_pass_cryptomatte_object"):
+                context.view_layer.use_pass_cryptomatte_object = False
 
             if scene.use_nodes:
                 tree = scene.node_tree

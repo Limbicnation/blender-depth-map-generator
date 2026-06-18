@@ -28,6 +28,9 @@ class DEPTHMAP_OT_setup(Operator):
 
             if settings.mask_enabled and settings.mask_source == "OBJECT_INDEX":
                 view_layer.use_pass_object_index = True
+            elif settings.mask_enabled and settings.mask_source == "CRYPTOMATTE":
+                if hasattr(view_layer, "use_pass_cryptomatte_object"):
+                    view_layer.use_pass_cryptomatte_object = True
 
             # Force Blender to process pass changes before we create
             # compositor nodes that depend on those passes (IndexOB, etc.)
