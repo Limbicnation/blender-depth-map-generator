@@ -99,7 +99,14 @@ class DEPTHMAP_OT_export_mask(Operator):
             # recreated. The existing check at line 75 only validates the
             # FileOutput connection, not this upstream link.
             if settings.mask_source == "OBJECT_INDEX":
-                self._ensure_index_ob_link(tree, view_layer, scene, context)
+                if not self._ensure_index_ob_link(tree, view_layer, scene, context):
+                    self.report(
+                        {"ERROR"},
+                        "Could not restore IndexOB link. The Object Index pass may "
+                        "be disabled. Run 'Setup Depth Map' with mask enabled, "
+                        "then try again.",
+                    )
+                    return {"CANCELLED"}
 
             # Re-sync the FileOutput to the current settings. The node keeps the
             # base_path it was given when the pipeline was built, so if an
@@ -182,11 +189,15 @@ class DEPTHMAP_OT_export_mask(Operator):
         CompositorNodeRLayers node when use_pass_object_index is toggled off.
         Re-enabling the pass recreates the socket but does NOT restore the
         link. This method detects the gap and reconnects.
+
+        Returns:
+            True if the IndexOB socket exists and is linked to DM_MaskCompare.
+            False if recovery failed (socket missing or nodes absent).
         """
         mask_rl = nodes.find_dm_node(tree, "DM_MaskRenderLayers")
         compare = nodes.find_dm_node(tree, "DM_MaskCompare")
         if not mask_rl or not compare:
-            return
+            return False
 
         index_ob = next((s for s in mask_rl.outputs if s.name == "IndexOB"), None)
         if index_ob is None:
@@ -196,5 +207,10 @@ class DEPTHMAP_OT_export_mask(Operator):
             context.evaluated_depsgraph_get().update()
             index_ob = next((s for s in mask_rl.outputs if s.name == "IndexOB"), None)
 
-        if index_ob and not index_ob.links:
+        if index_ob is None:
+            return False
+
+        if not index_ob.links:
             tree.links.new(index_ob, compare.inputs[0])
+
+        return True
