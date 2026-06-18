@@ -1,10 +1,12 @@
 """DepthMapSettings PropertyGroup - all addon settings stored per scene."""
 
+import bpy
 from bpy.props import (
     BoolProperty,
     EnumProperty,
     FloatProperty,
     IntProperty,
+    PointerProperty,
     StringProperty,
 )
 from bpy.types import PropertyGroup
@@ -110,13 +112,13 @@ class DepthMapSettings(PropertyGroup):
     )
 
     output_bit_depth: EnumProperty(
-        name="Bit Depth",
-        description="Output bit depth for PNG files (16-bit recommended for ComfyUI)",
+        name="EXR Precision",
+        description="OpenEXR float precision (32-bit full recommended for depth)",
         items=[
-            ("8", "8-bit", "Standard 8-bit PNG"),
-            ("16", "16-bit", "High precision 16-bit PNG (recommended)"),
+            ("16", "16-bit half", "Half-float EXR (smaller files, fine for masks)"),
+            ("32", "32-bit full", "Full-float EXR (lossless depth, recommended)"),
         ],
-        default="16",
+        default="32",
     )
 
     contrast_value: FloatProperty(
@@ -152,32 +154,44 @@ class DepthMapSettings(PropertyGroup):
         name="Mask Source",
         description="Method for generating the alpha mask",
         items=[
-            ("OBJECT_INDEX", "Object Index", "Use Object Pass Index to isolate objects"),
             (
                 "CRYPTOMATTE",
                 "Cryptomatte",
-                "Use Cryptomatte for precise anti-aliased masks (Cycles only)",
+                "Precise anti-aliased object mask. Works in Eevee Next and Cycles "
+                "(recommended)",
+            ),
+            (
+                "OBJECT_INDEX",
+                "Object Index",
+                "Use Object Pass Index to isolate objects. NOTE: Eevee Next does not "
+                "populate the Object Index pass — use Cryptomatte instead",
             ),
         ],
-        default="OBJECT_INDEX",
+        default="CRYPTOMATTE",
     )
 
     mask_output_format: EnumProperty(
-        name="Mask Format",
-        description="Output format for the mask",
+        name="Mask Channels",
+        description="Channel layout for the mask EXR",
         items=[
             (
                 "GRAYSCALE",
-                "Grayscale PNG",
-                "Single channel mask (loads directly as mask in ComfyUI)",
+                "Grayscale",
+                "Single-channel matte (loads directly as a mask in ComfyUI)",
             ),
             (
                 "RGBA_PNG",
-                "RGBA PNG",
+                "RGBA",
                 "RGBA with alpha channel (use SplitImageWithAlpha in ComfyUI)",
             ),
         ],
         default="GRAYSCALE",
+    )
+
+    mask_object: PointerProperty(
+        name="Mask Object",
+        description="Object to isolate with Cryptomatte (matched by name)",
+        type=bpy.types.Object,
     )
 
     mask_index: IntProperty(

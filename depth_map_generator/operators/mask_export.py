@@ -39,14 +39,24 @@ class DEPTHMAP_OT_export_mask(Operator):
             prefs_addon = context.preferences.addons.get("depth_map_generator")
             prefs = prefs_addon.preferences if prefs_addon else None
 
-            # Cryptomatte is Cycles-only.
-            if settings.mask_source == "CRYPTOMATTE" and scene.render.engine != "CYCLES":
+            # Cryptomatte requires a target object (matched by name).
+            if settings.mask_source == "CRYPTOMATTE" and not settings.mask_object:
                 self.report(
                     {"ERROR"},
-                    "Cryptomatte requires Cycles render engine. "
-                    "Switch to Cycles or use Object Index mode.",
+                    "Select a Mask Object for Cryptomatte (Alpha Mask panel).",
                 )
                 return {"CANCELLED"}
+
+            # Object Index does not work in Eevee Next — warn but continue so
+            # Cycles users are unaffected.
+            if settings.mask_source == "OBJECT_INDEX" and scene.render.engine.startswith(
+                "BLENDER_EEVEE"
+            ):
+                self.report(
+                    {"WARNING"},
+                    "Object Index is not populated by Eevee Next — the mask will be "
+                    "blank. Switch Mask Source to Cryptomatte.",
+                )
 
             # Explicitly enable the Object Index pass *before* we look for or
             # build the mask pipeline. create_mask_pipeline() also does this,
@@ -125,12 +135,18 @@ class DEPTHMAP_OT_export_mask(Operator):
                 mask_node,
                 output_dir,
                 prefix,
-                bit_depth=settings.output_bit_depth,
+                bit_depth="16",
                 color_mode=color_mode,
             )
 
             if source_socket and not mask_node.inputs[0].links:
                 tree.links.new(source_socket, mask_node.inputs[0])
+
+            # Keep the Cryptomatte node pointed at the currently selected object.
+            if settings.mask_source == "CRYPTOMATTE":
+                crypto = nodes.find_dm_node(tree, "DM_Cryptomatte")
+                if crypto:
+                    nodes._configure_cryptomatte(crypto, view_layer, settings)
 
             # Render. Mask animation is independent of depth output method.
             # Single-frame uses EXEC_DEFAULT (blocking) so we can verify the
@@ -159,7 +175,7 @@ class DEPTHMAP_OT_export_mask(Operator):
             return {"CANCELLED"}
 
     def _verify_mask_output(self, output_dir):
-        """Warn if no mask PNG was written after a blocking render.
+        """Warn if no mask EXR was written after a blocking render.
 
         Reports an ERROR (not just WARNING) when the output directory does not
         exist, since this means the FileOutput node had nowhere to write.
@@ -171,10 +187,10 @@ class DEPTHMAP_OT_export_mask(Operator):
                 f"Output directory does not exist: {abs_dir}. Check the mask output path setting.",
             )
             return
-        png_files = [
-            f for f in os.listdir(abs_dir) if f.lower().endswith(".png") and "mask" in f.lower()
+        mask_files = [
+            f for f in os.listdir(abs_dir) if f.lower().endswith(".exr") and "mask" in f.lower()
         ]
-        if not png_files:
+        if not mask_files:
             self.report(
                 {"WARNING"},
                 f"Render completed but no mask files found in {abs_dir}. "

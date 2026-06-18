@@ -29,8 +29,10 @@ class DEPTHMAP_OT_setup(Operator):
             if settings.mask_enabled and settings.mask_source == "OBJECT_INDEX":
                 view_layer.use_pass_object_index = True
             elif settings.mask_enabled and settings.mask_source == "CRYPTOMATTE":
-                if hasattr(view_layer, "use_pass_cryptomatte_object"):
-                    view_layer.use_pass_cryptomatte_object = True
+                view_layer.use_pass_cryptomatte_object = True
+                if hasattr(view_layer, "use_pass_cryptomatte_accurate"):
+                    view_layer.use_pass_cryptomatte_accurate = True
+                view_layer.pass_cryptomatte_depth = 6
 
             # Force Blender to process pass changes before we create
             # compositor nodes that depend on those passes (IndexOB, etc.)
@@ -46,10 +48,12 @@ class DEPTHMAP_OT_setup(Operator):
                 nodes.remove_dm_nodes(tree)
 
                 # Build depth pipeline
-                render_layers, output_socket = nodes.create_depth_pipeline(tree, settings, prefs)
+                render_layers, data_socket, preview_socket = nodes.create_depth_pipeline(
+                    tree, settings, prefs
+                )
 
-                # Create output nodes
-                nodes.create_output_nodes(tree, settings, output_socket, prefs)
+                # Create output nodes (file taps raw data, viewer taps preview)
+                nodes.create_output_nodes(tree, settings, data_socket, preview_socket, prefs)
 
                 # Build mask pipeline if enabled (uses separate RenderLayers)
                 if settings.mask_enabled:
