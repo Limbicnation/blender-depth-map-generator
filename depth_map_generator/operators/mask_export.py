@@ -87,6 +87,19 @@ class DEPTHMAP_OT_export_mask(Operator):
                 self.report({'ERROR'}, f"Invalid mask output path: {error_msg}")
                 return {'CANCELLED'}
 
+            # Re-sync the FileOutput to the current settings. The node keeps the
+            # base_path it was given when the pipeline was built, so if an
+            # earlier setup used a different output path/format the node would
+            # still write there — and _verify_mask_output would look in the new
+            # path and falsely report "no mask files found". Reconfiguring is
+            # idempotent and makes the output land where the user expects.
+            color_mode = 'RGBA' if settings.mask_output_format == 'RGBA_PNG' else 'BW'
+            prefix = "mask_" if settings.render_animation else "mask_map"
+            nodes.configure_file_output(
+                mask_node, output_dir, prefix,
+                bit_depth=settings.output_bit_depth, color_mode=color_mode,
+            )
+
             # Render. Mask animation is independent of depth output method.
             # Single-frame uses EXEC_DEFAULT (blocking) so we can verify the
             # FileOutput actually wrote files before reporting success.
