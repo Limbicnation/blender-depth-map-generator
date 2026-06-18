@@ -8,11 +8,11 @@ class DEPTHMAP_PT_depth_settings(Panel):
 
     bl_label = "Depth Settings"
     bl_idname = "DEPTHMAP_PT_depth_settings"
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
     bl_category = "Depth Map"
     bl_parent_id = "DEPTHMAP_PT_main_panel"
-    bl_options = {'DEFAULT_CLOSED'}
+    bl_options = {"DEFAULT_CLOSED"}
 
     def draw(self, context):
         layout = self.layout
@@ -29,7 +29,7 @@ class DEPTHMAP_PT_depth_settings(Panel):
             row.prop(settings, "far_distance")
 
         # Scale factor (relevant for LOGARITHMIC and RAW)
-        if settings.depth_normalization in {'LOGARITHMIC', 'RAW'}:
+        if settings.depth_normalization in {"LOGARITHMIC", "RAW"}:
             layout.prop(settings, "depth_scale_factor")
 
         # Bit depth

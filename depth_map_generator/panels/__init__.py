@@ -1,9 +1,9 @@
 """Panel class exports."""
 
-from .main_panel import DEPTHMAP_PT_main_panel
 from .depth_settings_panel import DEPTHMAP_PT_depth_settings
-from .output_panel import DEPTHMAP_PT_output
+from .main_panel import DEPTHMAP_PT_main_panel
 from .mask_panel import DEPTHMAP_PT_mask
+from .output_panel import DEPTHMAP_PT_output
 
 __all__ = [
     "DEPTHMAP_PT_main_panel",

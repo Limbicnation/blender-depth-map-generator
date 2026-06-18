@@ -1,0 +1,11 @@
+schema_version = "1.0.0"
+id = "depth_map_generator"
+version = "2.0.0"
+name = "Depth Map Generator"
+tagline = "Automate depth map and alpha mask rendering for ComfyUI workflows"
+maintainer = "Gero Doll"
+type = "add-on"
+license = ["SPDX:Apache-2.0"]
+blender_version_min = "4.2.0"
+website = "https://github.com/limbicnation/blender-depth-map-generator"
+tags = ["Render", "Pipeline", "ComfyUI"]

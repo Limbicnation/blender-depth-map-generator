@@ -1,7 +1,5 @@
 """DepthMapSettings PropertyGroup - all addon settings stored per scene."""
 
-import bpy
-from bpy.types import PropertyGroup
 from bpy.props import (
     BoolProperty,
     EnumProperty,
@@ -9,6 +7,7 @@ from bpy.props import (
     IntProperty,
     StringProperty,
 )
+from bpy.types import PropertyGroup
 
 
 class DepthMapSettings(PropertyGroup):
@@ -49,18 +48,18 @@ class DepthMapSettings(PropertyGroup):
         name="Output Method",
         description="How to output the depth map",
         items=[
-            ('COMPOSITE', "Composite", "Send depth map to compositor output"),
-            ('VIEWER', "Viewer", "Send depth map to viewer node for preview"),
-            ('FILE_OUTPUT', "File Output", "Save depth map to a separate file"),
+            ("COMPOSITE", "Composite", "Send depth map to compositor output"),
+            ("VIEWER", "Viewer", "Send depth map to viewer node for preview"),
+            ("FILE_OUTPUT", "File Output", "Save depth map to a separate file"),
         ],
-        default='VIEWER',
+        default="VIEWER",
     )
 
     output_path: StringProperty(
         name="Output Path",
         description="Path to save depth map files",
         default="//depth_maps/",
-        subtype='DIR_PATH',
+        subtype="DIR_PATH",
     )
 
     # --- Existing animation properties (preserved) ---
@@ -95,14 +94,11 @@ class DepthMapSettings(PropertyGroup):
         name="Normalization",
         description="How to normalize raw depth values",
         items=[
-            ('LINEAR', "Linear",
-             "Linear mapping with inversion (default, good for most scenes)"),
-            ('LOGARITHMIC', "Logarithmic",
-             "Logarithmic mapping for more near-field detail"),
-            ('RAW', "Raw",
-             "Unprocessed depth values (no MapRange or ColorRamp)"),
+            ("LINEAR", "Linear", "Linear mapping with inversion (default, good for most scenes)"),
+            ("LOGARITHMIC", "Logarithmic", "Logarithmic mapping for more near-field detail"),
+            ("RAW", "Raw", "Unprocessed depth values (no MapRange or ColorRamp)"),
         ],
-        default='LINEAR',
+        default="LINEAR",
     )
 
     depth_scale_factor: FloatProperty(
@@ -117,10 +113,10 @@ class DepthMapSettings(PropertyGroup):
         name="Bit Depth",
         description="Output bit depth for PNG files (16-bit recommended for ComfyUI)",
         items=[
-            ('8', "8-bit", "Standard 8-bit PNG"),
-            ('16', "16-bit", "High precision 16-bit PNG (recommended)"),
+            ("8", "8-bit", "Standard 8-bit PNG"),
+            ("16", "16-bit", "High precision 16-bit PNG (recommended)"),
         ],
-        default='16',
+        default="16",
     )
 
     contrast_value: FloatProperty(
@@ -156,24 +152,32 @@ class DepthMapSettings(PropertyGroup):
         name="Mask Source",
         description="Method for generating the alpha mask",
         items=[
-            ('OBJECT_INDEX', "Object Index",
-             "Use Object Pass Index to isolate objects"),
-            ('CRYPTOMATTE', "Cryptomatte",
-             "Use Cryptomatte for precise anti-aliased masks (Cycles only)"),
+            ("OBJECT_INDEX", "Object Index", "Use Object Pass Index to isolate objects"),
+            (
+                "CRYPTOMATTE",
+                "Cryptomatte",
+                "Use Cryptomatte for precise anti-aliased masks (Cycles only)",
+            ),
         ],
-        default='OBJECT_INDEX',
+        default="OBJECT_INDEX",
     )
 
     mask_output_format: EnumProperty(
         name="Mask Format",
         description="Output format for the mask",
         items=[
-            ('GRAYSCALE', "Grayscale PNG",
-             "Single channel mask (loads directly as mask in ComfyUI)"),
-            ('RGBA_PNG', "RGBA PNG",
-             "RGBA with alpha channel (use SplitImageWithAlpha in ComfyUI)"),
+            (
+                "GRAYSCALE",
+                "Grayscale PNG",
+                "Single channel mask (loads directly as mask in ComfyUI)",
+            ),
+            (
+                "RGBA_PNG",
+                "RGBA PNG",
+                "RGBA with alpha channel (use SplitImageWithAlpha in ComfyUI)",
+            ),
         ],
-        default='GRAYSCALE',
+        default="GRAYSCALE",
     )
 
     mask_index: IntProperty(
@@ -188,5 +192,5 @@ class DepthMapSettings(PropertyGroup):
         name="Mask Output Path",
         description="Path to save mask map files",
         default="//mask_maps/",
-        subtype='DIR_PATH',
+        subtype="DIR_PATH",
     )

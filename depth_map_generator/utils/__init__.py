@@ -1,7 +1,6 @@
 """Utility module exports."""
 
-from . import nodes
-from . import paths
+from . import nodes, paths
 
 __all__ = [
     "nodes",

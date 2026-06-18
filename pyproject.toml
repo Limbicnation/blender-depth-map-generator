@@ -15,6 +15,9 @@ target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
+# Blender's operator/panel classes must be named DEPTHMAP_OT_*/_PT_*, which
+# violates PEP 8 CapWords. The naming is required by the bpy API, not optional.
+ignore = ["N801"]
 
 [tool.mypy]
 python_version = "3.10"

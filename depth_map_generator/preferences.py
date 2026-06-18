@@ -1,8 +1,7 @@
 """Addon preferences for persistent user defaults."""
 
-import bpy
+from bpy.props import BoolProperty, StringProperty
 from bpy.types import AddonPreferences
-from bpy.props import BoolProperty, EnumProperty, StringProperty
 
 
 class DEPTHMAP_AddonPreferences(AddonPreferences):
@@ -14,14 +13,14 @@ class DEPTHMAP_AddonPreferences(AddonPreferences):
         name="Default Depth Output",
         description="Default directory for depth map output",
         default="//depth_maps/",
-        subtype='DIR_PATH',
+        subtype="DIR_PATH",
     )
 
     default_mask_output_dir: StringProperty(
         name="Default Mask Output",
         description="Default directory for mask map output",
         default="//mask_maps/",
-        subtype='DIR_PATH',
+        subtype="DIR_PATH",
     )
 
     auto_create_directories: BoolProperty(
