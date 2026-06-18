@@ -13,7 +13,13 @@
   </table>
 </div>
 
-A simple Blender addon that automates depth map (Z-depth) creation and rendering with a clean UI.
+A Blender addon that automates depth map (Z-depth) and alpha mask rendering with a
+clean viewport UI, built for feeding ComfyUI and other AI image/video workflows.
+
+## Requirements
+
+- **Blender 4.2+** (developed and tested against 4.5 LTS / Eevee Next)
+- Works with both **Eevee Next** and **Cycles**
 
 ## Installation
 
@@ -26,29 +32,68 @@ A simple Blender addon that automates depth map (Z-depth) creation and rendering
 
 ## Usage
 
-1. Access the addon in the 3D Viewport sidebar (N-panel) under "Depth Map" tab
-2. Click "Setup Depth Map" to configure Z-pass and compositing
-3. Adjust depth range settings if needed
-4. Choose output method (Composite/Viewer/File)
-5. When using File Output, you can toggle animation mode to render sequences
-6. Click "Render Depth Map" or "Render Depth Animation"
+The addon lives in the 3D Viewport sidebar (**N-panel**) under the **"Depth Map"** tab.
+
+### Depth maps
+
+1. Click **Setup Depth Map** to enable the Z pass and build the compositing nodes
+2. Adjust **Depth Settings** (normalization mode, near/far range, scale, contrast)
+3. Pick an **Output** method (Composite / Viewer / File Output)
+4. For File Output, optionally enable **Render Animation** for sequences
+5. Click **Render Depth Map** (or **Render Depth Animation**)
+
+### Alpha masks
+
+1. Expand the **Alpha Mask** sub-panel and enable it
+2. **Mask Source = Cryptomatte** (default, recommended) — pick the **Mask Object** to isolate
+3. Click **Setup Depth Map**, then **Export Mask**
+
+> **Eevee Next note:** Use **Cryptomatte**, not Object Index. Eevee Next never
+> populates the legacy Object Index pass, so an Object Index mask comes out blank.
+> Object Index remains available for Cycles users who rely on it.
 
 ## Features
 
-- One-click depth map setup
-- Custom near/far distance controls
-- Depth normalization modes: LINEAR (default), LOGARITHMIC, RAW
-- Alpha mask export via Object Index or Cryptomatte (Cycles only)
-- 16-bit PNG output for maximum depth precision
-- Contrast/brightness sliders and depth scale factor
-- Multiple output options (Composite/Viewer/File)
-- Animation sequence support
-  - Render entire animation as depth maps
-  - Use scene frame range or set custom range
-  - Automatic frame numbering for sequences
-- ComfyUI integration — specify input directory directly
-- Simple UI in viewport sidebar
-- Easy reset functionality
+- One-click depth map setup (Z pass + compositor nodes)
+- Depth normalization modes: **LINEAR** (default), **LOGARITHMIC**, **RAW**
+- Custom near/far distance, depth scale factor, contrast/brightness controls
+- **Cryptomatte** alpha mask export — precise, anti-aliased, works in **Eevee Next and Cycles**
+- Legacy **Object Index** mask mode retained for Cycles
+- **OpenEXR output** for lossless precision:
+  - Depth: 32-bit full float (ZIP)
+  - Mask: 16-bit half float (ZIP)
+- Lossless float export keeps depth precision intact for ComfyUI inputs
+  (no 8/16-bit PNG quantization, no Contrast distortion on the exported data)
+- Multiple output targets: Composite / Viewer / File Output
+- Animation sequence support (scene or custom frame range, auto frame numbering)
+- Configurable default output directories in addon Preferences
+- Simple viewport UI with one-click reset
+
+## How it works
+
+The addon builds a `DM_`-prefixed compositor node tree:
+
+- **Depth:** `Depth → MapRange → Contrast → ColorRamp` for the on-screen preview,
+  while **File Output taps the raw `MapRange` socket** so exported depth stays
+  linear and undistorted.
+- **Mask (Cryptomatte):** `CryptomatteV2` (source `RENDER`, `ViewLayer.CryptoObject`
+  layer, `matte_id` = chosen object name) → File Output.
+
+All addon-owned nodes use the `DM_` prefix and are safe to remove with
+**Reset Compositing**; your own nodes are left untouched.
+
+## Development
+
+```bash
+# Lint
+ruff check depth_map_generator
+
+# Build the installable zip
+python build_zip.py    # → depth_map_generator.zip
+```
+
+The addon is a Python package under `depth_map_generator/` (operators, panels,
+properties, and `utils/nodes.py` for the compositor pipeline).
 
 ## License
 
