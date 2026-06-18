@@ -31,31 +31,42 @@ def clear_all_nodes(tree):
     tree.links.new(render_layers.outputs["Image"], composite.inputs["Image"])
 
 
-def configure_file_output(node, base_path, prefix, bit_depth="16", color_mode="BW"):
+def _apply_image_format(fmt, file_format, color_mode, bit_depth):
+    """Apply format settings to an ImageFormatSettings struct.
+
+    OpenEXR is the default: it stores raw float depth/matte data losslessly,
+    unlike PNG/JPG which quantize to 8/16-bit integers and destroy precision.
+    """
+    fmt.file_format = file_format
+    fmt.color_mode = color_mode
+    fmt.color_depth = bit_depth
+    if file_format == "OPEN_EXR":
+        fmt.exr_codec = "ZIP"  # lossless
+    elif file_format == "PNG":
+        fmt.compression = 15
+
+
+def configure_file_output(
+    node, base_path, prefix, bit_depth="32", color_mode="BW", file_format="OPEN_EXR"
+):
     """Centralized FileOutput node configuration.
 
     Args:
         node: CompositorNodeOutputFile node
         base_path: Absolute directory path for output
         prefix: Filename prefix (e.g. "depth_" or "depth_map")
-        bit_depth: '8' or '16'
+        bit_depth: EXR float precision '16' (half) or '32' (full)
         color_mode: 'BW' or 'RGBA'
+        file_format: 'OPEN_EXR' (default) or 'PNG'
     """
     # Ensure base_path ends with a separator so Blender treats it as a
     # directory, not a filename prefix.
     if base_path and not base_path.endswith(("/", "\\")):
         base_path = base_path + os.sep
     node.base_path = base_path
-    node.format.file_format = "PNG"
-    node.format.color_mode = color_mode
-    node.format.color_depth = bit_depth
-    node.format.compression = 15
-
+    _apply_image_format(node.format, file_format, color_mode, bit_depth)
     node.file_slots[0].path = prefix
-    node.file_slots[0].format.file_format = "PNG"
-    node.file_slots[0].format.color_mode = color_mode
-    node.file_slots[0].format.color_depth = bit_depth
-    node.file_slots[0].format.compression = 15
+    _apply_image_format(node.file_slots[0].format, file_format, color_mode, bit_depth)
 
 
 def _create_render_layers(tree):
@@ -76,7 +87,11 @@ def _append_range_contrast_ramp(tree, input_socket, settings, x_offset):
     """Append MapRange, Contrast, and ColorRamp nodes to the pipeline.
 
     Returns:
-        NodeSocket: The final output socket from the ColorRamp node.
+        tuple: (data_socket, preview_socket) where data_socket is the raw
+            normalized MapRange output (for lossless file export) and
+            preview_socket is the contrast/ColorRamp output (for viewing).
+            The Contrast node applies a non-linear transform that destroys
+            depth precision, so file output must tap the pre-contrast socket.
     """
     # MapRange node
     map_range = tree.nodes.new(type="CompositorNodeMapRange")
@@ -122,13 +137,13 @@ def _append_range_contrast_ramp(tree, input_socket, settings, x_offset):
 
     tree.links.new(contrast.outputs["Image"], colorramp.inputs["Fac"])
 
-    return colorramp.outputs[0]
+    return map_range.outputs["Value"], colorramp.outputs[0]
 
 
 def _create_linear_pipeline(tree, render_layers, settings):
     """LINEAR normalization: Depth -> MapRange(inverted) -> Contrast -> ColorRamp.
 
-    Returns the final output socket to connect to output nodes.
+    Returns (data_socket, preview_socket).
     """
     return _append_range_contrast_ramp(tree, render_layers.outputs["Depth"], settings, 200)
 
@@ -137,7 +152,7 @@ def _create_logarithmic_pipeline(tree, render_layers, settings):
     """LOGARITHMIC normalization:
     Depth -> Multiply(scale) -> Log -> MapRange -> Contrast -> ColorRamp.
 
-    Returns the final output socket.
+    Returns (data_socket, preview_socket).
     """
 
     # Scale factor multiply
@@ -163,9 +178,10 @@ def _create_logarithmic_pipeline(tree, render_layers, settings):
 
 def _create_raw_pipeline(tree, render_layers, settings):
     """RAW normalization:
-    Depth -> Multiply(scale) -> Contrast -> Output (no MapRange, no ColorRamp).
+    Depth -> Multiply(scale) -> Contrast (preview only).
 
-    Returns the final output socket.
+    Returns (data_socket, preview_socket). data_socket is the scaled depth
+    before the Contrast transform, so file export keeps raw values.
     """
 
     # Scale factor multiply
@@ -186,7 +202,7 @@ def _create_raw_pipeline(tree, render_layers, settings):
     contrast.inputs["Bright"].default_value = settings.brightness_value
     tree.links.new(multiply.outputs["Value"], contrast.inputs["Image"])
 
-    return contrast.outputs["Image"]
+    return multiply.outputs["Value"], contrast.outputs["Image"]
 
 
 def create_depth_pipeline(tree, settings, prefs=None):
@@ -198,21 +214,19 @@ def create_depth_pipeline(tree, settings, prefs=None):
         prefs: AddonPreferences (optional, for default paths)
 
     Returns:
-        tuple: (render_layers_node, final_output_socket)
+        tuple: (render_layers_node, data_socket, preview_socket)
     """
     render_layers = _create_render_layers(tree)
 
     normalization = settings.depth_normalization
-    if normalization == "LINEAR":
-        output_socket = _create_linear_pipeline(tree, render_layers, settings)
-    elif normalization == "LOGARITHMIC":
-        output_socket = _create_logarithmic_pipeline(tree, render_layers, settings)
+    if normalization == "LOGARITHMIC":
+        data_socket, preview_socket = _create_logarithmic_pipeline(tree, render_layers, settings)
     elif normalization == "RAW":
-        output_socket = _create_raw_pipeline(tree, render_layers, settings)
-    else:
-        output_socket = _create_linear_pipeline(tree, render_layers, settings)
+        data_socket, preview_socket = _create_raw_pipeline(tree, render_layers, settings)
+    else:  # LINEAR (default)
+        data_socket, preview_socket = _create_linear_pipeline(tree, render_layers, settings)
 
-    return render_layers, output_socket
+    return render_layers, data_socket, preview_socket
 
 
 def _get_output_x_offset(normalization):
@@ -224,13 +238,14 @@ def _get_output_x_offset(normalization):
     return 800  # LINEAR
 
 
-def create_output_nodes(tree, settings, output_socket, prefs=None):
+def create_output_nodes(tree, settings, data_socket, preview_socket, prefs=None):
     """Create output nodes (Composite, Viewer, FileOutput) based on settings.
 
     Args:
         tree: The compositor node tree
         settings: DepthMapSettings property group
-        output_socket: The final socket from the depth pipeline to connect
+        data_socket: Raw normalized depth socket (lossless, for file export)
+        preview_socket: Contrast/ColorRamp socket (for Composite/Viewer display)
         prefs: AddonPreferences (optional)
     """
     from . import paths
@@ -238,12 +253,12 @@ def create_output_nodes(tree, settings, output_socket, prefs=None):
     x_offset = _get_output_x_offset(settings.depth_normalization)
     bit_depth = settings.output_bit_depth
 
-    # Always create Composite node
+    # Always create Composite node (uses the visual preview socket)
     composite = tree.nodes.new(type="CompositorNodeComposite")
     composite.name = "DM_Composite"
     composite.label = "Depth Map Output"
     composite.location = (x_offset, -100)
-    tree.links.new(output_socket, composite.inputs["Image"])
+    tree.links.new(preview_socket, composite.inputs["Image"])
 
     if settings.depth_output_method == "COMPOSITE":
         composite.location = (x_offset, 0)
@@ -253,7 +268,7 @@ def create_output_nodes(tree, settings, output_socket, prefs=None):
         viewer.name = "DM_Viewer"
         viewer.label = "Depth Preview"
         viewer.location = (x_offset, 50)
-        tree.links.new(output_socket, viewer.inputs["Image"])
+        tree.links.new(preview_socket, viewer.inputs["Image"])
 
     elif settings.depth_output_method == "FILE_OUTPUT":
         output_dir = paths.get_depth_output_dir(settings, prefs)
@@ -265,9 +280,10 @@ def create_output_nodes(tree, settings, output_socket, prefs=None):
         file_output.location = (x_offset, 100)
 
         prefix = "depth_" if settings.render_animation else "depth_map"
+        # File export taps the raw normalized socket — no Contrast distortion.
         configure_file_output(file_output, output_dir, prefix, bit_depth=bit_depth, color_mode="BW")
 
-        tree.links.new(output_socket, file_output.inputs[0])
+        tree.links.new(data_socket, file_output.inputs[0])
 
     # Optional preview viewer alongside file output
     if settings.preview_before_export and settings.depth_output_method == "FILE_OUTPUT":
@@ -275,7 +291,31 @@ def create_output_nodes(tree, settings, output_socket, prefs=None):
         viewer.name = "DM_Viewer"
         viewer.label = "Depth Preview"
         viewer.location = (x_offset, 200)
-        tree.links.new(output_socket, viewer.inputs["Image"])
+        tree.links.new(preview_socket, viewer.inputs["Image"])
+
+
+def _configure_cryptomatte(crypto, view_layer, settings):
+    """Point a CryptomatteV2 node at the scene's object crypto layer.
+
+    The layer_name enum uses 'ViewLayer.CryptoObject' form; setting it to a
+    bad value raises 'enum not found', so we resolve a valid identifier at
+    runtime. matte_id is the exact object name (Cryptomatte matches by name,
+    not pass index).
+    """
+    crypto.source = "RENDER"
+    crypto.scene = bpy.context.scene
+
+    desired = f"{view_layer.name}.CryptoObject"
+    prop = crypto.bl_rna.properties.get("layer_name")
+    valid = [item.identifier for item in prop.enum_items] if prop else []
+    if desired in valid:
+        crypto.layer_name = desired
+    elif valid:
+        # Fall back to the first CryptoObject layer Blender exposes.
+        crypto.layer_name = next((v for v in valid if "CryptoObject" in v), valid[0])
+
+    if settings.mask_object:
+        crypto.matte_id = settings.mask_object.name
 
 
 def create_mask_pipeline(tree, settings, prefs=None):
@@ -338,11 +378,22 @@ def create_mask_pipeline(tree, settings, prefs=None):
         if bpy.app.version < (3, 2, 0):
             raise RuntimeError("CryptomatteV2 requires Blender 3.2 or newer.")
 
+        # Enable the Cryptomatte object pass so the engine (Eevee Next or
+        # Cycles) writes the required Crypto AOV during rendering.
+        view_layer = bpy.context.view_layer
+        view_layer.use_pass_cryptomatte_object = True
+        if hasattr(view_layer, "use_pass_cryptomatte_accurate"):
+            view_layer.use_pass_cryptomatte_accurate = True  # sub-pixel accuracy
+        view_layer.pass_cryptomatte_depth = 6  # max objects per pixel
+        bpy.context.scene.update_tag()
+        bpy.context.evaluated_depsgraph_get().update()
+
         # Cryptomatte node
         crypto = tree.nodes.new(type="CompositorNodeCryptomatteV2")
         crypto.name = "DM_Cryptomatte"
-        crypto.label = "Cryptomatte Mask"
+        crypto.label = "Object Mask (Cryptomatte)"
         crypto.location = (200, -300)
+        _configure_cryptomatte(crypto, view_layer, settings)
         mask_output_socket = crypto.outputs["Matte"]
 
     else:
@@ -359,11 +410,12 @@ def create_mask_pipeline(tree, settings, prefs=None):
 
     color_mode = "RGBA" if settings.mask_output_format == "RGBA_PNG" else "BW"
     prefix = "mask_" if settings.render_animation else "mask_map"
+    # Masks are binary coverage — 16-bit half EXR is ample and smaller on disk.
     configure_file_output(
         mask_file_output,
         output_dir,
         prefix,
-        bit_depth=settings.output_bit_depth,
+        bit_depth="16",
         color_mode=color_mode,
     )
 
@@ -422,6 +474,28 @@ def update_depth_nodes(tree, settings, prefs=None):
     # Update or create mask pipeline
     mask_file_output = find_dm_node(tree, "DM_MaskFileOutput")
     if settings.mask_enabled:
+        # Detect mask source mismatch (e.g. user switched from Object Index to
+        # Cryptomatte). The existing pipeline nodes are incompatible, so remove
+        # them and rebuild from scratch.
+        source_mismatch = False
+        if settings.mask_source == "OBJECT_INDEX" and find_dm_node(tree, "DM_Cryptomatte"):
+            source_mismatch = True
+        elif settings.mask_source == "CRYPTOMATTE" and find_dm_node(tree, "DM_MaskCompare"):
+            source_mismatch = True
+
+        if source_mismatch:
+            for name in (
+                "DM_MaskFileOutput",
+                "DM_MaskRenderLayers",
+                "DM_MaskCompare",
+                "DM_Cryptomatte",
+            ):
+                node = find_dm_node(tree, name)
+                if node:
+                    tree.nodes.remove(node)
+            create_mask_pipeline(tree, settings, prefs)
+            return True
+
         if mask_file_output:
             # Update existing mask file output path
             mask_output_dir = paths.get_mask_output_dir(settings, prefs)
@@ -437,7 +511,7 @@ def update_depth_nodes(tree, settings, prefs=None):
                 mask_file_output,
                 mask_output_dir,
                 prefix,
-                bit_depth=settings.output_bit_depth,
+                bit_depth="16",
                 color_mode=color_mode,
             )
 
@@ -448,6 +522,11 @@ def update_depth_nodes(tree, settings, prefs=None):
             compare_node = find_dm_node(tree, "DM_MaskCompare")
             if compare_node:
                 compare_node.inputs[1].default_value = float(settings.mask_index)
+
+            # Sync Cryptomatte target object (matched by name) to the node
+            crypto_node = find_dm_node(tree, "DM_Cryptomatte")
+            if crypto_node:
+                _configure_cryptomatte(crypto_node, bpy.context.view_layer, settings)
 
         else:
             # Mask was enabled after initial setup — create the pipeline now.

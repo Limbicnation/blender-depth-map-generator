@@ -26,12 +26,17 @@ class DEPTHMAP_PT_mask(Panel):
         # Mask source selector
         layout.prop(settings, "mask_source")
 
-        # Cryptomatte warning for non-Cycles
-        if settings.mask_source == "CRYPTOMATTE" and context.scene.render.engine != "CYCLES":
-            layout.label(text="Cryptomatte requires Cycles!", icon="ERROR")
+        if settings.mask_source == "CRYPTOMATTE":
+            # Cryptomatte: pick the object to isolate (matched by name).
+            layout.prop(settings, "mask_object")
+            if not settings.mask_object:
+                layout.label(text="Select an object to mask", icon="ERROR")
 
         # Object Index settings
-        if settings.mask_source == "OBJECT_INDEX":
+        elif settings.mask_source == "OBJECT_INDEX":
+            if context.scene.render.engine.startswith("BLENDER_EEVEE"):
+                layout.label(text="Object Index is blank in Eevee Next!", icon="ERROR")
+                layout.label(text="Use Cryptomatte instead.", icon="INFO")
             layout.prop(settings, "mask_index")
             layout.label(
                 text="Set Pass Index on object: Properties > Object > Relations",
