@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Build the Blender addon zip for distribution."""
+
 import zipfile
 from pathlib import Path
 

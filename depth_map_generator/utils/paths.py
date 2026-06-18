@@ -18,7 +18,7 @@ def resolve_output_path(path, create=True, prefs=None):
     """
     abs_path = bpy.path.abspath(path)
     should_create = create
-    if prefs and hasattr(prefs, 'auto_create_directories'):
+    if prefs and hasattr(prefs, "auto_create_directories"):
         should_create = create and prefs.auto_create_directories
     if should_create:
         os.makedirs(abs_path, exist_ok=True)

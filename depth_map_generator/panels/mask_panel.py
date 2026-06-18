@@ -8,11 +8,11 @@ class DEPTHMAP_PT_mask(Panel):
 
     bl_label = "Alpha Mask"
     bl_idname = "DEPTHMAP_PT_mask"
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
     bl_category = "Depth Map"
     bl_parent_id = "DEPTHMAP_PT_main_panel"
-    bl_options = {'DEFAULT_CLOSED'}
+    bl_options = {"DEFAULT_CLOSED"}
 
     def draw_header(self, context):
         settings = context.scene.depth_map_settings
@@ -27,16 +27,15 @@ class DEPTHMAP_PT_mask(Panel):
         layout.prop(settings, "mask_source")
 
         # Cryptomatte warning for non-Cycles
-        if (settings.mask_source == 'CRYPTOMATTE'
-                and context.scene.render.engine != 'CYCLES'):
-            layout.label(text="Cryptomatte requires Cycles!", icon='ERROR')
+        if settings.mask_source == "CRYPTOMATTE" and context.scene.render.engine != "CYCLES":
+            layout.label(text="Cryptomatte requires Cycles!", icon="ERROR")
 
         # Object Index settings
-        if settings.mask_source == 'OBJECT_INDEX':
+        if settings.mask_source == "OBJECT_INDEX":
             layout.prop(settings, "mask_index")
             layout.label(
                 text="Set Pass Index on object: Properties > Object > Relations",
-                icon='INFO',
+                icon="INFO",
             )
 
         # Format and output path
@@ -48,8 +47,8 @@ class DEPTHMAP_PT_mask(Panel):
         row = layout.row()
         row.enabled = settings.mask_enabled
         if settings.render_animation:
-            row.operator("depthmap.export_mask", text="Export Mask Animation",
-                          icon='RENDER_ANIMATION')
+            row.operator(
+                "depthmap.export_mask", text="Export Mask Animation", icon="RENDER_ANIMATION"
+            )
         else:
-            row.operator("depthmap.export_mask", text="Export Mask",
-                          icon='RENDER_STILL')
+            row.operator("depthmap.export_mask", text="Export Mask", icon="RENDER_STILL")

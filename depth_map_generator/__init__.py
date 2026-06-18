@@ -1,3 +1,4 @@
+# ruff: noqa: E402
 """Depth Map Generator v2.0 - Blender addon for depth map and alpha mask rendering."""
 
 bl_info = {
@@ -13,16 +14,16 @@ bl_info = {
 import bpy
 from bpy.props import PointerProperty
 
-from .properties import DepthMapSettings
-from .preferences import DEPTHMAP_AddonPreferences
-from .operators.setup import DEPTHMAP_OT_setup
+from .operators.mask_export import DEPTHMAP_OT_export_mask
 from .operators.render import DEPTHMAP_OT_render
 from .operators.reset import DEPTHMAP_OT_reset
-from .operators.mask_export import DEPTHMAP_OT_export_mask
-from .panels.main_panel import DEPTHMAP_PT_main_panel
+from .operators.setup import DEPTHMAP_OT_setup
 from .panels.depth_settings_panel import DEPTHMAP_PT_depth_settings
-from .panels.output_panel import DEPTHMAP_PT_output
+from .panels.main_panel import DEPTHMAP_PT_main_panel
 from .panels.mask_panel import DEPTHMAP_PT_mask
+from .panels.output_panel import DEPTHMAP_PT_output
+from .preferences import DEPTHMAP_AddonPreferences
+from .properties import DepthMapSettings
 
 # Registration order: PropertyGroup -> Preferences -> Operators -> Parent Panel -> Sub-panels
 classes = (

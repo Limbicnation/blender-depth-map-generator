@@ -27,17 +27,17 @@ class DEPTHMAP_OT_render(Operator):
 
             # Resolve and validate output path when using file output.
             output_dir = ""
-            if settings.depth_output_method == 'FILE_OUTPUT':
+            if settings.depth_output_method == "FILE_OUTPUT":
                 output_dir = paths.get_depth_output_dir(settings, prefs)
                 is_valid, error_msg = paths.validate_output_path(output_dir)
                 if not is_valid:
                     self.report(
-                        {'ERROR'},
+                        {"ERROR"},
                         f"Invalid depth output path: {error_msg}",
                     )
-                    return {'CANCELLED'}
+                    return {"CANCELLED"}
 
-            if settings.depth_output_method == 'FILE_OUTPUT' and settings.render_animation:
+            if settings.depth_output_method == "FILE_OUTPUT" and settings.render_animation:
                 # Set custom frame range if not using scene range.
                 if not settings.use_scene_frame_range:
                     scene.frame_start = settings.frame_start
@@ -45,24 +45,24 @@ class DEPTHMAP_OT_render(Operator):
 
                 frame_count = scene.frame_end - scene.frame_start + 1
                 self.report(
-                    {'INFO'},
+                    {"INFO"},
                     f"Rendering depth animation: {frame_count} frames to {output_dir}",
                 )
-                bpy.ops.render.render('INVOKE_DEFAULT', animation=True)
+                bpy.ops.render.render("INVOKE_DEFAULT", animation=True)
             else:
-                self.report({'INFO'}, "Rendering single depth map frame")
+                self.report({"INFO"}, "Rendering single depth map frame")
                 # EXEC_DEFAULT blocks until the compositor finishes evaluating,
                 # so the Viewer node is populated and the Image Editor can show
                 # the depth preview without manual node selection. Animations
                 # stay on INVOKE_DEFAULT to avoid freezing the UI.
-                bpy.ops.render.render('EXEC_DEFAULT')
+                bpy.ops.render.render("EXEC_DEFAULT")
                 self._activate_viewer(tree)
 
-            return {'FINISHED'}
+            return {"FINISHED"}
 
         except Exception as e:
-            self.report({'ERROR'}, f"Render failed: {str(e)}")
-            return {'CANCELLED'}
+            self.report({"ERROR"}, f"Render failed: {str(e)}")
+            return {"CANCELLED"}
 
     @staticmethod
     def _activate_viewer(tree):
@@ -86,5 +86,5 @@ class DEPTHMAP_OT_render(Operator):
         # Force every Image Editor area to redraw so the preview appears.
         for window in bpy.context.window_manager.windows:
             for area in window.screen.areas:
-                if area.type == 'IMAGE_EDITOR':
+                if area.type == "IMAGE_EDITOR":
                     area.tag_redraw()

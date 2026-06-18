@@ -23,7 +23,7 @@ class DEPTHMAP_OT_export_mask(Operator):
     bl_idname = "depthmap.export_mask"
     bl_label = "Export Mask"
     bl_description = "Render and export an alpha mask for the selected objects"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {"REGISTER", "UNDO"}
 
     @classmethod
     def poll(cls, context):
@@ -40,19 +40,19 @@ class DEPTHMAP_OT_export_mask(Operator):
             prefs = prefs_addon.preferences if prefs_addon else None
 
             # Cryptomatte is Cycles-only.
-            if settings.mask_source == 'CRYPTOMATTE' and scene.render.engine != 'CYCLES':
+            if settings.mask_source == "CRYPTOMATTE" and scene.render.engine != "CYCLES":
                 self.report(
-                    {'ERROR'},
+                    {"ERROR"},
                     "Cryptomatte requires Cycles render engine. "
                     "Switch to Cycles or use Object Index mode.",
                 )
-                return {'CANCELLED'}
+                return {"CANCELLED"}
 
             # Explicitly enable the Object Index pass *before* we look for or
             # build the mask pipeline. create_mask_pipeline() also does this,
             # but enabling here guarantees the pass is on even when the pipeline
             # node already exists from a setup that ran with mask disabled.
-            if settings.mask_source == 'OBJECT_INDEX':
+            if settings.mask_source == "OBJECT_INDEX":
                 view_layer.use_pass_object_index = True
                 scene.update_tag()
                 context.evaluated_depsgraph_get().update()
@@ -74,18 +74,18 @@ class DEPTHMAP_OT_export_mask(Operator):
             # Validate the mask FileOutput is actually connected to the pipeline.
             if not mask_node or not mask_node.inputs[0].links:
                 self.report(
-                    {'ERROR'},
+                    {"ERROR"},
                     "Mask pipeline is not connected. "
                     "Try 'Reset Compositing' then 'Setup Depth Map' with mask enabled.",
                 )
-                return {'CANCELLED'}
+                return {"CANCELLED"}
 
             # Validate output path before committing to a render.
             output_dir = paths.get_mask_output_dir(settings, prefs)
             is_valid, error_msg = paths.validate_output_path(output_dir)
             if not is_valid:
-                self.report({'ERROR'}, f"Invalid mask output path: {error_msg}")
-                return {'CANCELLED'}
+                self.report({"ERROR"}, f"Invalid mask output path: {error_msg}")
+                return {"CANCELLED"}
 
             # Re-sync the FileOutput to the current settings. The node keeps the
             # base_path it was given when the pipeline was built, so if an
@@ -93,11 +93,14 @@ class DEPTHMAP_OT_export_mask(Operator):
             # still write there — and _verify_mask_output would look in the new
             # path and falsely report "no mask files found". Reconfiguring is
             # idempotent and makes the output land where the user expects.
-            color_mode = 'RGBA' if settings.mask_output_format == 'RGBA_PNG' else 'BW'
+            color_mode = "RGBA" if settings.mask_output_format == "RGBA_PNG" else "BW"
             prefix = "mask_" if settings.render_animation else "mask_map"
             nodes.configure_file_output(
-                mask_node, output_dir, prefix,
-                bit_depth=settings.output_bit_depth, color_mode=color_mode,
+                mask_node,
+                output_dir,
+                prefix,
+                bit_depth=settings.output_bit_depth,
+                color_mode=color_mode,
             )
 
             # Render. Mask animation is independent of depth output method.
@@ -111,20 +114,20 @@ class DEPTHMAP_OT_export_mask(Operator):
 
                 frame_count = scene.frame_end - scene.frame_start + 1
                 self.report(
-                    {'INFO'},
+                    {"INFO"},
                     f"Exporting mask animation: {frame_count} frames to {output_dir}",
                 )
-                bpy.ops.render.render('INVOKE_DEFAULT', animation=True)
+                bpy.ops.render.render("INVOKE_DEFAULT", animation=True)
             else:
-                self.report({'INFO'}, "Exporting single mask frame")
-                bpy.ops.render.render('EXEC_DEFAULT')
+                self.report({"INFO"}, "Exporting single mask frame")
+                bpy.ops.render.render("EXEC_DEFAULT")
                 self._verify_mask_output(output_dir)
 
-            return {'FINISHED'}
+            return {"FINISHED"}
 
         except Exception as e:
-            self.report({'ERROR'}, f"Mask export failed: {str(e)}")
-            return {'CANCELLED'}
+            self.report({"ERROR"}, f"Mask export failed: {str(e)}")
+            return {"CANCELLED"}
 
     def _verify_mask_output(self, output_dir):
         """Warn (not fail) if no mask PNG was written after a blocking render.
@@ -137,12 +140,11 @@ class DEPTHMAP_OT_export_mask(Operator):
         if not os.path.isdir(abs_dir):
             return
         png_files = [
-            f for f in os.listdir(abs_dir)
-            if f.lower().endswith('.png') and 'mask' in f.lower()
+            f for f in os.listdir(abs_dir) if f.lower().endswith(".png") and "mask" in f.lower()
         ]
         if not png_files:
             self.report(
-                {'WARNING'},
+                {"WARNING"},
                 f"Render completed but no mask files found in {abs_dir}. "
                 "Check compositor node connections.",
             )

@@ -8,8 +8,8 @@ class DEPTHMAP_PT_output(Panel):
 
     bl_label = "Output"
     bl_idname = "DEPTHMAP_PT_output"
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
     bl_category = "Depth Map"
     bl_parent_id = "DEPTHMAP_PT_main_panel"
 
@@ -20,7 +20,7 @@ class DEPTHMAP_PT_output(Panel):
         # Output method selector
         layout.prop(settings, "depth_output_method")
 
-        if settings.depth_output_method == 'FILE_OUTPUT':
+        if settings.depth_output_method == "FILE_OUTPUT":
             layout.prop(settings, "output_path", text="")
 
             # Animation options
@@ -35,16 +35,14 @@ class DEPTHMAP_PT_output(Panel):
                 else:
                     row = box.row()
                     row.label(
-                        text=f"Scene Range: {context.scene.frame_start}"
-                             f" - {context.scene.frame_end}"
+                        text=f"Scene Range: {context.scene.frame_start} - {context.scene.frame_end}"
                     )
 
         # Render buttons
         layout.separator()
-        if (settings.depth_output_method == 'FILE_OUTPUT'
-                and settings.render_animation):
-            layout.operator("depthmap.render", text="Render Depth Animation",
-                             icon='RENDER_ANIMATION')
+        if settings.depth_output_method == "FILE_OUTPUT" and settings.render_animation:
+            layout.operator(
+                "depthmap.render", text="Render Depth Animation", icon="RENDER_ANIMATION"
+            )
         else:
-            layout.operator("depthmap.render", text="Render Depth Map",
-                             icon='RENDER_STILL')
+            layout.operator("depthmap.render", text="Render Depth Map", icon="RENDER_STILL")
