@@ -5,7 +5,7 @@ bl_info = {
     "name": "Depth Map Generator",
     "author": "Gero Doll",
     "version": (2, 0, 0),
-    "blender": (3, 0, 0),
+    "blender": (4, 2, 0),
     "location": "View3D > Sidebar > Depth Map",
     "description": "Depth map and alpha mask generation for ComfyUI workflows",
     "category": "Render",
