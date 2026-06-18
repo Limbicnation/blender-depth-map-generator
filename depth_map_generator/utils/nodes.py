@@ -264,13 +264,10 @@ def create_output_nodes(tree, settings, output_socket, prefs=None):
         file_output.label = "Depth Map Files"
         file_output.location = (x_offset, 100)
 
-        # Link BEFORE configuring file slots — configure_file_output
-        # renames file_slots[0].path which also renames the input
-        # socket, making inputs['Image'] unreliable afterwards.
-        tree.links.new(output_socket, file_output.inputs[0])
-
         prefix = "depth_" if settings.render_animation else "depth_map"
         configure_file_output(file_output, output_dir, prefix, bit_depth=bit_depth, color_mode="BW")
+
+        tree.links.new(output_socket, file_output.inputs[0])
 
     # Optional preview viewer alongside file output
     if settings.preview_before_export and settings.depth_output_method == "FILE_OUTPUT":
@@ -360,11 +357,6 @@ def create_mask_pipeline(tree, settings, prefs=None):
     mask_file_output.label = "Mask Map Files"
     mask_file_output.location = (400, -300)
 
-    # Link BEFORE configuring file slots — configure_file_output
-    # renames file_slots[0].path which also renames the input
-    # socket, making inputs['Image'] unreliable afterwards.
-    tree.links.new(mask_output_socket, mask_file_output.inputs[0])
-
     color_mode = "RGBA" if settings.mask_output_format == "RGBA_PNG" else "BW"
     prefix = "mask_" if settings.render_animation else "mask_map"
     configure_file_output(
@@ -374,6 +366,8 @@ def create_mask_pipeline(tree, settings, prefs=None):
         bit_depth=settings.output_bit_depth,
         color_mode=color_mode,
     )
+
+    tree.links.new(mask_output_socket, mask_file_output.inputs[0])
 
 
 def update_depth_nodes(tree, settings, prefs=None):
@@ -413,9 +407,17 @@ def update_depth_nodes(tree, settings, prefs=None):
         output_dir = paths.get_depth_output_dir(settings, prefs)
         paths.resolve_output_path(output_dir, create=True, prefs=prefs)
         prefix = "depth_" if settings.render_animation else "depth_map"
+
+        source_socket = None
+        if file_output.inputs[0].links:
+            source_socket = file_output.inputs[0].links[0].from_socket
+
         configure_file_output(
             file_output, output_dir, prefix, bit_depth=settings.output_bit_depth, color_mode="BW"
         )
+
+        if source_socket and not file_output.inputs[0].links:
+            tree.links.new(source_socket, file_output.inputs[0])
 
     # Update or create mask pipeline
     mask_file_output = find_dm_node(tree, "DM_MaskFileOutput")
@@ -426,6 +428,11 @@ def update_depth_nodes(tree, settings, prefs=None):
             paths.resolve_output_path(mask_output_dir, create=True, prefs=prefs)
             color_mode = "RGBA" if settings.mask_output_format == "RGBA_PNG" else "BW"
             prefix = "mask_" if settings.render_animation else "mask_map"
+
+            source_socket = None
+            if mask_file_output.inputs[0].links:
+                source_socket = mask_file_output.inputs[0].links[0].from_socket
+
             configure_file_output(
                 mask_file_output,
                 mask_output_dir,
@@ -433,10 +440,15 @@ def update_depth_nodes(tree, settings, prefs=None):
                 bit_depth=settings.output_bit_depth,
                 color_mode=color_mode,
             )
+
+            if source_socket and not mask_file_output.inputs[0].links:
+                tree.links.new(source_socket, mask_file_output.inputs[0])
+
             # Sync mask index threshold to comparator node
             compare_node = find_dm_node(tree, "DM_MaskCompare")
             if compare_node:
                 compare_node.inputs[1].default_value = float(settings.mask_index)
+
         else:
             # Mask was enabled after initial setup — create the pipeline now.
             # Errors are intentionally not caught here so the caller (setup

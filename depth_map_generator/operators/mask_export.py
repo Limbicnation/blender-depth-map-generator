@@ -95,6 +95,11 @@ class DEPTHMAP_OT_export_mask(Operator):
             # idempotent and makes the output land where the user expects.
             color_mode = "RGBA" if settings.mask_output_format == "RGBA_PNG" else "BW"
             prefix = "mask_" if settings.render_animation else "mask_map"
+
+            source_socket = None
+            if mask_node.inputs[0].links:
+                source_socket = mask_node.inputs[0].links[0].from_socket
+
             nodes.configure_file_output(
                 mask_node,
                 output_dir,
@@ -102,6 +107,9 @@ class DEPTHMAP_OT_export_mask(Operator):
                 bit_depth=settings.output_bit_depth,
                 color_mode=color_mode,
             )
+
+            if source_socket and not mask_node.inputs[0].links:
+                tree.links.new(source_socket, mask_node.inputs[0])
 
             # Render. Mask animation is independent of depth output method.
             # Single-frame uses EXEC_DEFAULT (blocking) so we can verify the
